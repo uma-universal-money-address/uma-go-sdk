@@ -8,11 +8,11 @@ import (
 	eciesgo "github.com/ecies/go/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma"
 	"net/url"
 	"strconv"
 	"testing"
 	"time"
-	"uma-go-sdk/uma"
 )
 
 func TestParse(t *testing.T) {
