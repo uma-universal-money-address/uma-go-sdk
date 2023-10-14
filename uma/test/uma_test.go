@@ -3,7 +3,6 @@ package uma_test
 import (
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	eciesgo "github.com/ecies/go/v2"
 	"github.com/stretchr/testify/assert"
@@ -244,8 +243,9 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 	payreqResponseJson, err := json.Marshal(payreqResponse)
 	require.NoError(t, err)
 
-	payreqResponse, err = uma.ParsePayReqResponse(payreqResponseJson)
+	parsedResponse, err := uma.ParsePayReqResponse(payreqResponseJson)
 	require.NoError(t, err)
+	require.Equal(t, payreqResponse, parsedResponse)
 }
 
 func createLnurlpRequest(t *testing.T, signingPrivateKey []byte) *uma.LnurlpRequest {
@@ -258,8 +258,8 @@ func createLnurlpRequest(t *testing.T, signingPrivateKey []byte) *uma.LnurlpRequ
 
 func createMetadataForBob() (string, error) {
 	metadata := [][]string{
-		{"text/plain", fmt.Sprintf("Pay to vasp2.com user $bob")},
-		{"text/identifier", fmt.Sprintf("$bob@vasp2.com")},
+		{"text/plain", "Pay to vasp2.com user $bob"},
+		{"text/identifier", "$bob@vasp2.com"},
 	}
 
 	jsonMetadata, err := json.Marshal(metadata)
