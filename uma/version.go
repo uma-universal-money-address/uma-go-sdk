@@ -106,10 +106,7 @@ func IsVersionSupported(version string) bool {
 		return false
 	}
 	_, supportsMajorVersion := GetSupportedMajorVersions()[parsedVersion.Major]
-	if !supportsMajorVersion {
-		return false
-	}
-	return true
+	return supportsMajorVersion
 }
 
 type ParsedVersion struct {
