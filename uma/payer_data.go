@@ -3,6 +3,7 @@ package uma
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 type PayerDataOptions struct {
@@ -53,6 +54,43 @@ type PayerData struct {
 	Compliance *CompliancePayerData `json:"compliance"`
 }
 
+type TravelRuleFormat struct {
+	// Type is the type of the travel rule format (e.g. IVMS).
+	Type string
+	// Version is the version of the travel rule format (e.g. 1.0).
+	Version *string
+}
+
+func (t *TravelRuleFormat) MarshalJSON() ([]byte, error) {
+	if t.Version == nil {
+		return []byte(t.Type), nil
+	}
+	return []byte(fmt.Sprintf(`%q@%q`, t.Type, &t.Version)), nil
+}
+
+func (t *TravelRuleFormat) UnmarshalJSON(data []byte) error {
+	var s string
+	err := json.Unmarshal(data, &s)
+	if err != nil {
+		return err
+	}
+
+	if !strings.Contains(s, "@") {
+		t.Type = s
+		return nil
+	}
+
+	parts := strings.Split(s, "@")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid travel rule format: %s", s)
+	}
+
+	t.Type = parts[0]
+	t.Version = &parts[1]
+
+	return nil
+}
+
 type CompliancePayerData struct {
 	// Utxos is the list of UTXOs of the sender's channels that might be used to fund the payment.
 	Utxos *[]string `json:"utxos"`
@@ -62,6 +100,8 @@ type CompliancePayerData struct {
 	KycStatus KycStatus `json:"kycStatus"`
 	// EncryptedTravelRuleInfo is the travel rule information of the sender. This is encrypted with the receiver's public encryption key.
 	EncryptedTravelRuleInfo *string `json:"encryptedTravelRuleInfo"`
+	// TravelRuleFormat is an optional standardized format of the travel rule information (e.g. IVMS). Null indicates raw json or a custom format.
+	TravelRuleFormat *TravelRuleFormat `json:"travelRuleFormat"`
 	// Signature is the base64-encoded signature of sha256(ReceiverAddress|Nonce|Timestamp).
 	Signature          string `json:"signature"`
 	SignatureNonce     string `json:"signatureNonce"`
