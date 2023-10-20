@@ -343,6 +343,7 @@ func GetVaspDomainFromUmaAddress(umaAddress string) (string, error) {
 //		payerName: the name of the sender (optional).
 //		payerEmail: the email of the sender (optional).
 //		trInfo: the travel rule information. This will be encrypted before sending to the receiver.
+//		trInfoFormat: the standardized format of the travel rule information (e.g. IVMS). Null indicates raw json or a custom format, or no travel rule information.
 //		isPayerKYCd: whether the sender is a KYC'd customer of the sending VASP.
 //		payerUtxos: the list of UTXOs of the sender's channels that might be used to fund the payment.
 //	 	payerNodePubKey: If known, the public key of the sender's node. If supported by the receiving VASP's compliance provider,
@@ -357,6 +358,7 @@ func GetPayRequest(
 	payerName *string,
 	payerEmail *string,
 	trInfo *string,
+	trInfoFormat *TravelRuleFormat,
 	payerKycStatus KycStatus,
 	payerUtxos *[]string,
 	payerNodePubKey *string,
@@ -367,6 +369,7 @@ func GetPayRequest(
 		sendingVaspPrivateKey,
 		payerIdentifier,
 		trInfo,
+		trInfoFormat,
 		payerKycStatus,
 		payerUtxos,
 		payerNodePubKey,
@@ -393,6 +396,7 @@ func getSignedCompliancePayerData(
 	sendingVaspPrivateKeyBytes []byte,
 	payerIdentifier string,
 	trInfo *string,
+	trInfoFormat *TravelRuleFormat,
 	payerKycStatus KycStatus,
 	payerUtxos *[]string,
 	payerNodePubKey *string,
@@ -418,6 +422,7 @@ func getSignedCompliancePayerData(
 
 	return &CompliancePayerData{
 		EncryptedTravelRuleInfo: encryptedTrInfo,
+		TravelRuleFormat:        trInfoFormat,
 		KycStatus:               payerKycStatus,
 		Utxos:                   payerUtxos,
 		NodePubKey:              payerNodePubKey,

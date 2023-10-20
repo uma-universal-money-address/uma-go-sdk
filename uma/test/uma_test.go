@@ -159,6 +159,11 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 	require.NoError(t, err)
 
 	trInfo := "some TR info for VASP2"
+	ivmsVersion := "101.1"
+	trFormat := uma.TravelRuleFormat{
+		Type:    "IVMS",
+		Version: &ivmsVersion,
+	}
 	payreq, err := uma.GetPayRequest(
 		receiverEncryptionPrivateKey.PubKey().SerializeUncompressed(),
 		senderSigningPrivateKey.Serialize(),
@@ -168,6 +173,7 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 		nil,
 		nil,
 		&trInfo,
+		&trFormat,
 		uma.KycStatusVerified,
 		nil,
 		nil,
@@ -183,6 +189,8 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 
 	err = uma.VerifyPayReqSignature(payreq, senderSigningPrivateKey.PubKey().SerializeUncompressed())
 	require.NoError(t, err)
+
+	require.Equal(t, payreq.PayerData.Compliance.TravelRuleFormat, &trFormat)
 
 	encryptedTrInfo := payreq.PayerData.Compliance.EncryptedTravelRuleInfo
 	require.NotNil(t, encryptedTrInfo)
@@ -218,6 +226,7 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 		nil,
 		nil,
 		&trInfo,
+		nil,
 		uma.KycStatusVerified,
 		nil,
 		nil,
