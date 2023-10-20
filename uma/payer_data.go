@@ -65,7 +65,7 @@ func (t *TravelRuleFormat) MarshalJSON() ([]byte, error) {
 	if t.Version == nil {
 		return []byte(t.Type), nil
 	}
-	return []byte(fmt.Sprintf(`%q@%q`, t.Type, &t.Version)), nil
+	return []byte(fmt.Sprintf("\"%s@%s\"", t.Type, *t.Version)), nil
 }
 
 func (t *TravelRuleFormat) UnmarshalJSON(data []byte) error {
