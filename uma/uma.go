@@ -183,7 +183,8 @@ func GetSignedLnurlpRequestUrl(
 	return unsignedRequest.EncodeToUrl()
 }
 
-// IsUmaLnurlpQuery Checks if the given URL is a valid UMA request.
+// IsUmaLnurlpQuery Checks if the given URL is a valid UMA request. If this returns false,
+// You should try to process the request as a regular LNURLp request to fall back to LNURL-PAY.
 func IsUmaLnurlpQuery(url url.URL) bool {
 	query, err := ParseLnurlpRequest(url)
 	return err == nil && query != nil
