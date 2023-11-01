@@ -4,9 +4,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	eciesgo "github.com/ecies/go/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	umacrypto "github.com/uma-universal-money-address/uma-crypto-uniffi/uma-crypto-go"
 	"github.com/uma-universal-money-address/uma-go-sdk/uma"
 	"net/url"
 	"strconv"
@@ -197,8 +197,7 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 
 	encryptedTrInfoBytes, err := hex.DecodeString(*encryptedTrInfo)
 	require.NoError(t, err)
-	eciesPrivKey := eciesgo.NewPrivateKeyFromBytes(receiverEncryptionPrivateKey.Serialize())
-	decryptedTrInfo, err := eciesgo.Decrypt(eciesPrivKey, encryptedTrInfoBytes)
+	decryptedTrInfo, err := umacrypto.DecryptEcies(encryptedTrInfoBytes, receiverEncryptionPrivateKey.Serialize())
 	require.NoError(t, err)
 	assert.Equal(t, trInfo, string(decryptedTrInfo))
 }
