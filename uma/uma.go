@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	umacrypto "github.com/uma-universal-money-address/uma-crypto-uniffi/uma-crypto-go"
 	"io"
 	"math/big"
 	"net/http"
@@ -13,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	umacrypto "github.com/uma-universal-money-address/uma-crypto-uniffi/uma-crypto-go"
 )
 
 // FetchPublicKeyForVasp fetches the public key for another VASP.
