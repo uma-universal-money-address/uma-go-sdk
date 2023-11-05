@@ -1,11 +1,14 @@
 package uma
 
 import (
+	"crypto"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	umacrypto "github.com/uma-universal-money-address/uma-crypto-uniffi/uma-crypto-go"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
+	eciesgo "github.com/ecies/go/v2"
 	"io"
 	"math/big"
 	"net/http"
@@ -78,7 +81,14 @@ func GenerateNonce() (*string, error) {
 }
 
 func signPayload(payload []byte, privateKeyBytes []byte) (*string, error) {
-	signature, err := umacrypto.SignEcdsa(payload, privateKeyBytes)
+	privateKey := secp256k1.PrivKeyFromBytes(privateKeyBytes)
+	hash := crypto.SHA256.New()
+	_, err := hash.Write(payload)
+	if err != nil {
+		return nil, err
+	}
+	hashedPayload := hash.Sum(nil)
+	signature, err := privateKey.ToECDSA().Sign(rand.Reader, hashedPayload, crypto.SHA256)
 	if err != nil {
 		return nil, err
 	}
@@ -109,10 +119,22 @@ func verifySignature(payload []byte, signature string, otherVaspPubKey []byte) e
 	if err != nil {
 		return err
 	}
-	verified, err := umacrypto.VerifyEcdsa(payload, decodedSignature, otherVaspPubKey)
+	parsedSignature, err := ecdsa.ParseDERSignature(decodedSignature)
 	if err != nil {
 		return err
 	}
+	pubKey, err := secp256k1.ParsePubKey(otherVaspPubKey)
+	if err != nil {
+		return err
+	}
+	sha256 := crypto.SHA256.New()
+	_, err = sha256.Write(payload)
+	if err != nil {
+		return err
+	}
+	hashedPayload := sha256.Sum(nil)
+	verified := parsedSignature.Verify(hashedPayload, pubKey)
+
 	if !verified {
 		return errors.New("invalid uma signature")
 	}
@@ -413,7 +435,12 @@ func getSignedCompliancePayerData(
 }
 
 func encryptTrInfo(trInfo string, receiverEncryptionPubKey []byte) (*string, error) {
-	encryptedTrInfoBytes, err := umacrypto.EncryptEcies([]byte(trInfo), receiverEncryptionPubKey)
+	pubKey, err := eciesgo.NewPublicKeyFromBytes(receiverEncryptionPubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	encryptedTrInfoBytes, err := eciesgo.Encrypt(pubKey, []byte(trInfo))
 	if err != nil {
 		return nil, err
 	}
