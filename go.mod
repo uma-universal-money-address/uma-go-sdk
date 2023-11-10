@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0
 	github.com/stretchr/testify v1.8.4
-	github.com/uma-universal-money-address/uma-crypto-uniffi/uma-crypto-go v0.0.0-20231110063216-6423bb4cbd1b
+	github.com/uma-universal-money-address/uma-crypto-uniffi/uma-crypto-go v0.0.0-20231110070726-158062d3a4e2
 )
 
 require (
