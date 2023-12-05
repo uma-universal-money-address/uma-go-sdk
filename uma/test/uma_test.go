@@ -139,7 +139,7 @@ func TestSignAndVerifyLnurlpResponse(t *testing.T) {
 				MillisatoshiPerUnit: 34_150,
 				MinSendable:         1,
 				MaxSendable:         10_000_000,
-				DisplayDecimals:     &dollarDisplayDecimals,
+				Decimals:            &dollarDisplayDecimals,
 			},
 		},
 		uma.KycStatusVerified,
