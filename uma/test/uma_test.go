@@ -117,7 +117,6 @@ func TestSignAndVerifyLnurlpResponse(t *testing.T) {
 	request := createLnurlpRequest(t, senderSigningPrivateKey.Serialize())
 	metadata, err := createMetadataForBob()
 	require.NoError(t, err)
-	dollarDisplayDecimals := 2
 	response, err := uma.GetLnurlpResponse(
 		request,
 		receiverSigningPrivateKey.Serialize(),
@@ -139,7 +138,7 @@ func TestSignAndVerifyLnurlpResponse(t *testing.T) {
 				MillisatoshiPerUnit: 34_150,
 				MinSendable:         1,
 				MaxSendable:         10_000_000,
-				Decimals:            &dollarDisplayDecimals,
+				Decimals:            2,
 			},
 		},
 		uma.KycStatusVerified,
