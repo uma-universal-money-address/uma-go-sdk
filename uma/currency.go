@@ -1,7 +1,8 @@
 package uma
 
 type Currency struct {
-	// Code is the ISO 4217 currency code (eg. USD).
+	// Code is the ISO 4217 (if applicable) currency code (eg. "USD"). For cryptocurrencies, this will  be a ticker
+	// symbol, such as BTC for Bitcoin.
 	Code string `json:"code"`
 
 	// Name is the full display name of the currency (eg. US Dollars).
