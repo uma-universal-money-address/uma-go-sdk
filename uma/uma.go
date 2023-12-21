@@ -10,6 +10,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	eciesgo "github.com/ecies/go/v2"
 	"io"
+	"math"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -485,13 +486,13 @@ func GetPayReqResponse(
 	invoiceCreator UmaInvoiceCreator,
 	metadata string,
 	currencyCode string,
-	conversionRate int64,
+	conversionRate float64,
 	receiverFeesMillisats int64,
 	receiverChannelUtxos []string,
 	receiverNodePubKey *string,
 	utxoCallback string,
 ) (*PayReqResponse, error) {
-	msatsAmount := query.Amount*conversionRate + receiverFeesMillisats
+	msatsAmount := int64(math.Round(float64(query.Amount)*conversionRate)) + receiverFeesMillisats
 	encodedPayerData, err := json.Marshal(query.PayerData)
 	if err != nil {
 		return nil, err
