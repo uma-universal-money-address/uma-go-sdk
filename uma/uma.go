@@ -268,8 +268,8 @@ func GetLnurlpResponse(
 	return &LnurlpResponse{
 		Tag:               "payRequest",
 		Callback:          callback,
-		MinSendable:       minSendableSats,
-		MaxSendable:       maxSendableSats,
+		MinSendable:       minSendableSats * 1000,
+		MaxSendable:       maxSendableSats * 1000,
 		EncodedMetadata:   encodedMetadata,
 		Currencies:        currencyOptions,
 		RequiredPayerData: payerDataOptions,
