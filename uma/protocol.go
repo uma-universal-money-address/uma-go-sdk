@@ -155,10 +155,10 @@ type PayReqResponseCompliance struct {
 }
 
 type PayReqResponsePaymentInfo struct {
-	// CurrencyCode is the ISO 3-digit currency code that the receiver will receive for this payment.
+	// CurrencyCode is the currency code that the receiver will receive for this payment.
 	CurrencyCode string `json:"currencyCode"`
 	// Multiplier is the conversion rate. It is the number of millisatoshis that the receiver will receive for 1 unit of the specified currency.
-	Multiplier int64 `json:"multiplier"`
+	Multiplier float64 `json:"multiplier"`
 	// ExchangeFeesMillisatoshi is the fees charged (in millisats) by the receiving VASP for this transaction. This is
 	// separate from the Multiplier.
 	ExchangeFeesMillisatoshi int64 `json:"exchangeFeesMillisatoshi"`
