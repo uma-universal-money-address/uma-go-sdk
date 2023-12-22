@@ -161,6 +161,11 @@ type PayReqResponsePaymentInfo struct {
 	// In this context, this is just for convenience. The conversion rate is also baked into the invoice amount itself.
 	// `invoice amount = amount * multiplier + exchangeFeesMillisatoshi`
 	Multiplier float64 `json:"multiplier"`
+	// Decimals is the number of digits after the decimal point for the receiving currency. For example, in USD, by
+	// convention, there are 2 digits for cents - $5.95. In this case, `Decimals` would be 2. This should align with the
+	// currency's `Decimals` field in the LNURLP response. It is included here for convenience. See
+	// [UMAD-04](/uma-04-local-currency.md) for details, edge cases, and examples.
+	Decimals int `json:"decimals"`
 	// ExchangeFeesMillisatoshi is the fees charged (in millisats) by the receiving VASP for this transaction. This is
 	// separate from the Multiplier.
 	ExchangeFeesMillisatoshi int64 `json:"exchangeFeesMillisatoshi"`

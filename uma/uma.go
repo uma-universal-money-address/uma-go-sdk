@@ -472,6 +472,8 @@ type UmaInvoiceCreator interface {
 //		metadata: the metadata that will be added to the invoice's metadata hash field. Note that this should not include
 //		    the extra payer data. That will be appended automatically.
 //		currencyCode: the code of the currency that the receiver will receive for this payment.
+//		currencyDecimals: the number of decimal places in the specified currency. For example, USD has 2 decimal places.
+//		    This should align with the decimals field returned for the chosen currency in the LNURLP response.
 //		conversionRate: milli-satoshis per the smallest unit of the specified currency. This rate is committed to by the
 //	    	receiving VASP until the invoice expires.
 //		receiverFeesMillisats: the fees charged (in millisats) by the receiving VASP to convert to the target currency.
@@ -486,6 +488,7 @@ func GetPayReqResponse(
 	invoiceCreator UmaInvoiceCreator,
 	metadata string,
 	currencyCode string,
+	currencyDecimals int,
 	conversionRate float64,
 	receiverFeesMillisats int64,
 	receiverChannelUtxos []string,
@@ -512,6 +515,7 @@ func GetPayReqResponse(
 		PaymentInfo: PayReqResponsePaymentInfo{
 			CurrencyCode:             currencyCode,
 			Multiplier:               conversionRate,
+			Decimals:                 currencyDecimals,
 			ExchangeFeesMillisatoshi: receiverFeesMillisats,
 		},
 	}, nil
