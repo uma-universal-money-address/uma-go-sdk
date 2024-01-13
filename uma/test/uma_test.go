@@ -94,7 +94,7 @@ func TestSignAndVerifyLnurlpRequest(t *testing.T) {
 	query, err := uma.ParseLnurlpRequest(*queryUrl)
 	require.NoError(t, err)
 	assert.Equal(t, query.UmaVersion, uma.UmaProtocolVersion)
-	err = uma.VerifyUmaLnurlpQuerySignature(query, privateKey.PubKey().SerializeUncompressed())
+	err = uma.VerifyUmaLnurlpQuerySignature(query, privateKey.PubKey().SerializeUncompressed(), getNonceCache())
 	require.NoError(t, err)
 }
 
@@ -105,7 +105,33 @@ func TestSignAndVerifyLnurlpRequestInvalidSignature(t *testing.T) {
 	require.NoError(t, err)
 	query, err := uma.ParseLnurlpRequest(*queryUrl)
 	require.NoError(t, err)
-	err = uma.VerifyUmaLnurlpQuerySignature(query, []byte("invalid pub key"))
+	err = uma.VerifyUmaLnurlpQuerySignature(query, []byte("invalid pub key"), getNonceCache())
+	require.Error(t, err)
+}
+
+func TestSignAndVerifyLnurlpRequestOldSignature(t *testing.T) {
+	privateKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err)
+	queryUrl, err := uma.GetSignedLnurlpRequestUrl(privateKey.Serialize(), "$bob@vasp2.com", "vasp1.com", true, nil)
+	require.NoError(t, err)
+	query, err := uma.ParseLnurlpRequest(*queryUrl)
+	require.NoError(t, err)
+	tomorrow := time.Now().AddDate(0, 0, 1)
+	err = uma.VerifyUmaLnurlpQuerySignature(query, privateKey.PubKey().SerializeUncompressed(), uma.NewInMemoryNonceCache(tomorrow))
+	require.Error(t, err)
+}
+
+func TestSignAndVerifyLnurlpRequestDuplicateNonce(t *testing.T) {
+	privateKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err)
+	queryUrl, err := uma.GetSignedLnurlpRequestUrl(privateKey.Serialize(), "$bob@vasp2.com", "vasp1.com", true, nil)
+	require.NoError(t, err)
+	query, err := uma.ParseLnurlpRequest(*queryUrl)
+	require.NoError(t, err)
+	nonceCache := getNonceCache()
+	err = nonceCache.CheckAndSaveNonce(query.Nonce, query.Timestamp)
+	require.NoError(t, err)
+	err = uma.VerifyUmaLnurlpQuerySignature(query, privateKey.PubKey().SerializeUncompressed(), nonceCache)
 	require.Error(t, err)
 }
 
@@ -149,7 +175,7 @@ func TestSignAndVerifyLnurlpResponse(t *testing.T) {
 
 	response, err = uma.ParseLnurlpResponse(responseJson)
 	require.NoError(t, err)
-	err = uma.VerifyUmaLnurlpResponseSignature(response, receiverSigningPrivateKey.PubKey().SerializeUncompressed())
+	err = uma.VerifyUmaLnurlpResponseSignature(response, receiverSigningPrivateKey.PubKey().SerializeUncompressed(), getNonceCache())
 	require.NoError(t, err)
 }
 
@@ -188,7 +214,7 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 	payreq, err = uma.ParsePayRequest(payreqJson)
 	require.NoError(t, err)
 
-	err = uma.VerifyPayReqSignature(payreq, senderSigningPrivateKey.PubKey().SerializeUncompressed())
+	err = uma.VerifyPayReqSignature(payreq, senderSigningPrivateKey.PubKey().SerializeUncompressed(), getNonceCache())
 	require.NoError(t, err)
 
 	require.Equal(t, payreq.PayerData.Compliance.TravelRuleFormat, &trFormat)
@@ -265,6 +291,11 @@ func createLnurlpRequest(t *testing.T, signingPrivateKey []byte) *uma.LnurlpRequ
 	query, err := uma.ParseLnurlpRequest(*queryUrl)
 	require.NoError(t, err)
 	return query
+}
+
+func getNonceCache() uma.NonceCache {
+	oneWeekAgo := time.Now().AddDate(0, 0, -7)
+	return uma.NewInMemoryNonceCache(oneWeekAgo)
 }
 
 func createMetadataForBob() (string, error) {
