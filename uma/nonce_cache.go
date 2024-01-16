@@ -36,13 +36,12 @@ func NewInMemoryNonceCache(oldestValidTimestamp time.Time) *InMemoryNonceCache {
 }
 
 func (c *InMemoryNonceCache) CheckAndSaveNonce(nonce string, timestamp time.Time) error {
-	if _, ok := c.cache.Load(nonce); ok {
-		return errors.New("nonce already used")
-	}
 	if timestamp.Before(c.oldestValidTimestamp) {
 		return errors.New("timestamp too old")
 	}
-	c.cache.Swap(nonce, timestamp)
+	if _, ok := c.cache.LoadOrStore(nonce, timestamp); ok {
+		return errors.New("nonce already used")
+	}
 	return nil
 }
 
