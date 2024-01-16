@@ -2,6 +2,7 @@ package uma
 
 import (
 	"errors"
+	"sync"
 	"time"
 )
 
@@ -23,33 +24,36 @@ type NonceCache interface {
 // It is not recommended to use this in production, as it will not persist across restarts. You likely want to implement
 // your own NonceCache that persists to a database of some sort.
 type InMemoryNonceCache struct {
-	cache                map[string]time.Time
+	cache                sync.Map
 	oldestValidTimestamp time.Time
 }
 
 func NewInMemoryNonceCache(oldestValidTimestamp time.Time) *InMemoryNonceCache {
 	return &InMemoryNonceCache{
-		cache:                make(map[string]time.Time),
+		cache:                sync.Map{},
 		oldestValidTimestamp: oldestValidTimestamp,
 	}
 }
 
 func (c *InMemoryNonceCache) CheckAndSaveNonce(nonce string, timestamp time.Time) error {
-	if _, ok := c.cache[nonce]; ok {
+	if _, ok := c.cache.Load(nonce); ok {
 		return errors.New("nonce already used")
 	}
 	if timestamp.Before(c.oldestValidTimestamp) {
 		return errors.New("timestamp too old")
 	}
-	c.cache[nonce] = timestamp
+	c.cache.Swap(nonce, timestamp)
 	return nil
 }
 
 func (c *InMemoryNonceCache) PurgeNoncesOlderThan(timestamp time.Time) {
-	for nonce, nonceTimestamp := range c.cache {
+	c.cache.Range(func(key, value interface{}) bool {
+		nonce := key.(string)
+		nonceTimestamp := value.(time.Time)
 		if nonceTimestamp.Before(timestamp) {
-			delete(c.cache, nonce)
+			c.cache.Delete(nonce)
 		}
-	}
+		return true
+	})
 	c.oldestValidTimestamp = timestamp
 }
