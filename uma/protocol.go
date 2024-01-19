@@ -37,7 +37,7 @@ func (q *LnurlpRequest) EncodeToUrl() (*url.URL, error) {
 		return nil, errors.New("invalid receiver address")
 	}
 	scheme := "https"
-	if strings.HasPrefix(receiverAddressParts[1], "localhost:") {
+	if IsDomainLocalhost(receiverAddressParts[1]) {
 		scheme = "http"
 	}
 	lnurlpUrl := url.URL{
