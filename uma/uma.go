@@ -38,7 +38,7 @@ func FetchPublicKeyForVasp(vaspDomain string, cache PublicKeyCache) (*PubKeyResp
 	}
 
 	scheme := "https://"
-	if strings.HasPrefix(vaspDomain, "localhost:") {
+	if IsDomainLocalhost(vaspDomain) {
 		scheme = "http://"
 	}
 	resp, err := http.Get(scheme + vaspDomain + "/.well-known/lnurlpubkey")
