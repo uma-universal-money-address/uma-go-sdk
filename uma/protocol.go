@@ -111,6 +111,8 @@ type PayRequest struct {
 	Amount int64 `json:"amount"`
 	// PayerData is the data that the sender will send to the receiver to identify themselves.
 	PayerData PayerData `json:"payerData"`
+	// RequestedPayeeData is the data that the sender is requesting about the payee.
+	RequestedPayeeData *PayeeDataOptions `json:"payeeData"`
 }
 
 func (q *PayRequest) Encode() ([]byte, error) {
@@ -133,6 +135,7 @@ type PayReqResponse struct {
 	Routes      []Route                   `json:"routes"`
 	Compliance  PayReqResponseCompliance  `json:"compliance"`
 	PaymentInfo PayReqResponsePaymentInfo `json:"paymentInfo"`
+	PayeeData   *PayeeData                `json:"payeeData"`
 }
 
 type Route struct {

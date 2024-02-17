@@ -205,6 +205,7 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 		nil,
 		nil,
 		"/api/lnurl/utxocallback?txid=1234",
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -244,6 +245,14 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 	require.NoError(t, err)
 
 	trInfo := "some TR info for VASP2"
+	payeeOptions := uma.PayeeDataOptions{
+		"identifier": uma.CounterPartyDataOption{
+			Mandatory: true,
+		},
+		"name": uma.CounterPartyDataOption{
+			Mandatory: false,
+		},
+	}
 	payreq, err := uma.GetPayRequest(
 		receiverEncryptionPrivateKey.PubKey().SerializeUncompressed(),
 		senderSigningPrivateKey.Serialize(),
@@ -258,11 +267,15 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 		nil,
 		nil,
 		"/api/lnurl/utxocallback?txid=1234",
+		&payeeOptions,
 	)
 	require.NoError(t, err)
 	client := &FakeInvoiceCreator{}
 	metadata, err := createMetadataForBob()
 	require.NoError(t, err)
+	payeeData := uma.PayeeData{
+		"identifier": "$alice@vasp1.com",
+	}
 	payreqResponse, err := uma.GetPayReqResponse(
 		payreq,
 		client,
@@ -274,6 +287,7 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 		[]string{"abcdef12345"},
 		nil,
 		"/api/lnurl/utxocallback?txid=1234",
+		&payeeData,
 	)
 	require.NoError(t, err)
 

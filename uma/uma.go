@@ -368,6 +368,7 @@ func GetVaspDomainFromUmaAddress(umaAddress string) (string, error) {
 //	 	payerNodePubKey: If known, the public key of the sender's node. If supported by the receiving VASP's compliance provider,
 //	        this will be used to pre-screen the sender's UTXOs for compliance purposes.
 //		utxoCallback: the URL that the receiver will call to send UTXOs of the channel that the receiver used to receive the payment once it completes.
+//		requestedPayeeData: the payer data options that the sender is requesting about the receiver.
 func GetPayRequest(
 	receiverEncryptionPubKey []byte,
 	sendingVaspPrivateKey []byte,
@@ -382,6 +383,7 @@ func GetPayRequest(
 	payerUtxos *[]string,
 	payerNodePubKey *string,
 	utxoCallback string,
+	requestedPayeeData *PayeeDataOptions,
 ) (*PayRequest, error) {
 	complianceData, err := getSignedCompliancePayerData(
 		receiverEncryptionPubKey,
@@ -407,6 +409,7 @@ func GetPayRequest(
 			Identifier: payerIdentifier,
 			Compliance: complianceData,
 		},
+		RequestedPayeeData: requestedPayeeData,
 	}, nil
 }
 
@@ -500,6 +503,8 @@ type UmaInvoiceCreator interface {
 //	        this will be used to pre-screen the receiver's UTXOs for compliance purposes.
 //		utxoCallback: the URL that the receiving VASP will call to send UTXOs of the channel that the receiver used to
 //	    	receive the payment once it completes.
+//		payeeData: the payee data which was requested by the sender. Can be nil if no payee data was requested or is
+//			mandatory.
 func GetPayReqResponse(
 	query *PayRequest,
 	invoiceCreator UmaInvoiceCreator,
@@ -511,6 +516,7 @@ func GetPayReqResponse(
 	receiverChannelUtxos []string,
 	receiverNodePubKey *string,
 	utxoCallback string,
+	payeeData *PayeeData,
 ) (*PayReqResponse, error) {
 	msatsAmount := int64(math.Round(float64(query.Amount)*conversionRate)) + receiverFeesMillisats
 	encodedPayerData, err := json.Marshal(query.PayerData)
@@ -535,6 +541,7 @@ func GetPayReqResponse(
 			Decimals:                 currencyDecimals,
 			ExchangeFeesMillisatoshi: receiverFeesMillisats,
 		},
+		PayeeData: payeeData,
 	}, nil
 }
 
