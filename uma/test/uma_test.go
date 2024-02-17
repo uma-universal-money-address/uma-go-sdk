@@ -151,10 +151,10 @@ func TestSignAndVerifyLnurlpResponse(t *testing.T) {
 		metadata,
 		1,
 		10_000_000,
-		uma.PayerDataOptions{
-			NameRequired:       false,
-			EmailRequired:      false,
-			ComplianceRequired: true,
+		uma.CounterPartyDataOptions{
+			"name":       uma.CounterPartyDataOption{Mandatory: false},
+			"email":      uma.CounterPartyDataOption{Mandatory: false},
+			"compliance": uma.CounterPartyDataOption{Mandatory: true},
 		},
 		[]uma.Currency{
 			{
@@ -218,9 +218,11 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 	err = uma.VerifyPayReqSignature(payreq, senderSigningPrivateKey.PubKey().SerializeUncompressed(), getNonceCache())
 	require.NoError(t, err)
 
-	require.Equal(t, payreq.PayerData.Compliance.TravelRuleFormat, &trFormat)
+	complianceData, err := payreq.PayerData.Compliance()
+	require.NoError(t, err)
+	require.Equal(t, complianceData.TravelRuleFormat, &trFormat)
 
-	encryptedTrInfo := payreq.PayerData.Compliance.EncryptedTravelRuleInfo
+	encryptedTrInfo := complianceData.EncryptedTravelRuleInfo
 	require.NotNil(t, encryptedTrInfo)
 
 	encryptedTrInfoBytes, err := hex.DecodeString(*encryptedTrInfo)
@@ -245,7 +247,7 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 	require.NoError(t, err)
 
 	trInfo := "some TR info for VASP2"
-	payeeOptions := uma.PayeeDataOptions{
+	payeeOptions := uma.CounterPartyDataOptions{
 		"identifier": uma.CounterPartyDataOption{
 			Mandatory: true,
 		},

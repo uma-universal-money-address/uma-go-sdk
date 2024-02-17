@@ -70,7 +70,7 @@ type LnurlpResponse struct {
 	MaxSendable       int64                   `json:"maxSendable"`
 	EncodedMetadata   string                  `json:"metadata"`
 	Currencies        []Currency              `json:"currencies"`
-	RequiredPayerData PayerDataOptions        `json:"payerData"`
+	RequiredPayerData CounterPartyDataOptions `json:"payerData"`
 	Compliance        LnurlComplianceResponse `json:"compliance"`
 	// UmaVersion is the version of the UMA protocol that VASP2 has chosen for this transaction based on its own support
 	// and VASP1's specified preference in the LnurlpRequest. For the version negotiation flow, see
@@ -112,19 +112,33 @@ type PayRequest struct {
 	// PayerData is the data that the sender will send to the receiver to identify themselves.
 	PayerData PayerData `json:"payerData"`
 	// RequestedPayeeData is the data that the sender is requesting about the payee.
-	RequestedPayeeData *PayeeDataOptions `json:"payeeData"`
+	RequestedPayeeData *CounterPartyDataOptions `json:"payeeData"`
 }
 
 func (q *PayRequest) Encode() ([]byte, error) {
 	return json.Marshal(q)
 }
 
-func (q *PayRequest) signablePayload() []byte {
-	senderAddress := q.PayerData.Identifier
-	signatureNonce := q.PayerData.Compliance.SignatureNonce
-	signatureTimestamp := q.PayerData.Compliance.SignatureTimestamp
-	payloadString := strings.Join([]string{senderAddress, signatureNonce, strconv.FormatInt(signatureTimestamp, 10)}, "|")
-	return []byte(payloadString)
+func (q *PayRequest) signablePayload() ([]byte, error) {
+	senderAddress := q.PayerData.Identifier()
+	if senderAddress == nil || *senderAddress == "" {
+		return nil, errors.New("payer data is missing")
+	}
+	complianceData, err := q.PayerData.Compliance()
+	if err != nil {
+		return nil, err
+	}
+	if complianceData == nil {
+		return nil, errors.New("compliance data is missing")
+	}
+	signatureNonce := complianceData.SignatureNonce
+	signatureTimestamp := complianceData.SignatureTimestamp
+	payloadString := strings.Join([]string{
+		*senderAddress,
+		signatureNonce,
+		strconv.FormatInt(signatureTimestamp, 10),
+	}, "|")
+	return []byte(payloadString), nil
 }
 
 // PayReqResponse is the response sent by the receiver to the sender to provide an invoice.

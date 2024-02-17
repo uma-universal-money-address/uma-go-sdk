@@ -106,13 +106,25 @@ func signPayload(payload []byte, privateKeyBytes []byte) (*string, error) {
 //	otherVaspPubKey: the bytes of the signing public key of the VASP making this request.
 //	nonceCache: the NonceCache cache to use to prevent replay attacks.
 func VerifyPayReqSignature(query *PayRequest, otherVaspPubKey []byte, nonceCache NonceCache) error {
-	err := nonceCache.CheckAndSaveNonce(
-		query.PayerData.Compliance.SignatureNonce,
-		time.Unix(query.PayerData.Compliance.SignatureTimestamp, 0))
+	complianceData, err := query.PayerData.Compliance()
 	if err != nil {
 		return err
 	}
-	return verifySignature(query.signablePayload(), query.PayerData.Compliance.Signature, otherVaspPubKey)
+	if complianceData == nil {
+		return errors.New("missing compliance data")
+	}
+	err = nonceCache.CheckAndSaveNonce(
+		complianceData.SignatureNonce,
+		time.Unix(complianceData.SignatureTimestamp, 0),
+	)
+	if err != nil {
+		return err
+	}
+	signablePayload, err := query.signablePayload()
+	if err != nil {
+		return err
+	}
+	return verifySignature(signablePayload, complianceData.Signature, otherVaspPubKey)
 }
 
 // verifySignature Verifies the signature of the uma request.
@@ -264,7 +276,7 @@ func GetLnurlpResponse(
 	encodedMetadata string,
 	minSendableSats int64,
 	maxSendableSats int64,
-	payerDataOptions PayerDataOptions,
+	payerDataOptions CounterPartyDataOptions,
 	currencyOptions []Currency,
 	receiverKycStatus KycStatus,
 ) (*LnurlpResponse, error) {
@@ -383,7 +395,7 @@ func GetPayRequest(
 	payerUtxos *[]string,
 	payerNodePubKey *string,
 	utxoCallback string,
-	requestedPayeeData *PayeeDataOptions,
+	requestedPayeeData *CounterPartyDataOptions,
 ) (*PayRequest, error) {
 	complianceData, err := getSignedCompliancePayerData(
 		receiverEncryptionPubKey,
@@ -404,10 +416,10 @@ func GetPayRequest(
 		CurrencyCode: currencyCode,
 		Amount:       amount,
 		PayerData: PayerData{
-			Name:       payerName,
-			Email:      payerEmail,
-			Identifier: payerIdentifier,
-			Compliance: complianceData,
+			"name":       payerName,
+			"email":      payerEmail,
+			"identifier": payerIdentifier,
+			"compliance": complianceData,
 		},
 		RequestedPayeeData: requestedPayeeData,
 	}, nil
