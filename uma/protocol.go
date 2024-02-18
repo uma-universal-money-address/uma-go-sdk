@@ -80,8 +80,6 @@ type LnurlpResponse struct {
 
 // LnurlComplianceResponse is the `compliance` field  of the LnurlpResponse.
 type LnurlComplianceResponse struct {
-	// KycStatus indicates whether VASP2 has KYC information about the receiver.
-	KycStatus KycStatus `json:"kycStatus"`
 	// Signature is the base64-encoded signature of sha256(ReceiverAddress|Nonce|Timestamp).
 	Signature string `json:"signature"`
 	// Nonce is a random string that is used to prevent replay attacks.
@@ -147,7 +145,6 @@ type PayReqResponse struct {
 	EncodedInvoice string `json:"pr"`
 	// Routes is usually just an empty list from legacy LNURL, which was replaced by route hints in the BOLT11 invoice.
 	Routes      []Route                   `json:"routes"`
-	Compliance  PayReqResponseCompliance  `json:"compliance"`
 	PaymentInfo PayReqResponsePaymentInfo `json:"paymentInfo"`
 	PayeeData   *PayeeData                `json:"payeeData"`
 }
@@ -160,15 +157,6 @@ type Route struct {
 		Msatoshi int64  `json:"msatoshi"`
 		Channel  string `json:"channel"`
 	} `json:"path"`
-}
-
-type PayReqResponseCompliance struct {
-	// NodePubKey is the public key of the receiver's node if known.
-	NodePubKey *string `json:"nodePubKey"`
-	// Utxos is a list of UTXOs of channels over which the receiver will likely receive the payment.
-	Utxos []string `json:"utxos"`
-	// UtxoCallback is the URL that the sender VASP will call to send UTXOs of the channel that the sender used to send the payment once it completes.
-	UtxoCallback string `json:"utxoCallback"`
 }
 
 type PayReqResponsePaymentInfo struct {
