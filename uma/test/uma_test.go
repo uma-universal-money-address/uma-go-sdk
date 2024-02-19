@@ -167,6 +167,7 @@ func TestSignAndVerifyLnurlpResponse(t *testing.T) {
 				Decimals:            2,
 			},
 		},
+		uma.KycStatusVerified,
 	)
 	require.NoError(t, err)
 	responseJson, err := json.Marshal(response)
@@ -288,7 +289,6 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 		[]string{"abcdef12345"},
 		nil,
 		"/api/lnurl/utxocallback?txid=1234",
-		uma.KycStatusVerified,
 		&payeeData,
 	)
 	require.NoError(t, err)

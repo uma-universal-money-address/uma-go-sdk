@@ -278,13 +278,14 @@ func GetLnurlpResponse(
 	maxSendableSats int64,
 	payerDataOptions CounterPartyDataOptions,
 	currencyOptions []Currency,
+	receiverKycStatus KycStatus,
 ) (*LnurlpResponse, error) {
 	umaVersion, err := SelectLowerVersion(request.UmaVersion, UmaProtocolVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	complianceResponse, err := getSignedLnurlpComplianceResponse(request, privateKeyBytes, requiresTravelRuleInfo)
+	complianceResponse, err := getSignedLnurlpComplianceResponse(request, privateKeyBytes, requiresTravelRuleInfo, receiverKycStatus)
 	if err != nil {
 		return nil, err
 	}
@@ -306,6 +307,7 @@ func getSignedLnurlpComplianceResponse(
 	query *LnurlpRequest,
 	privateKeyBytes []byte,
 	isSubjectToTravelRule bool,
+	receiverKycStatus KycStatus,
 ) (*LnurlComplianceResponse, error) {
 	timestamp := time.Now().Unix()
 	nonce, err := GenerateNonce()
@@ -318,6 +320,7 @@ func getSignedLnurlpComplianceResponse(
 		return nil, err
 	}
 	return &LnurlComplianceResponse{
+		KycStatus:             receiverKycStatus,
 		Signature:             *signature,
 		Nonce:                 *nonce,
 		Timestamp:             timestamp,
@@ -512,7 +515,6 @@ type UmaInvoiceCreator interface {
 //	        this will be used to pre-screen the receiver's UTXOs for compliance purposes.
 //		utxoCallback: the URL that the receiving VASP will call to send UTXOs of the channel that the receiver used to
 //	    	receive the payment once it completes.
-//		receiverKycStatus: whether the receiver is a KYC'd customer of the receiving VASP.
 //		payeeData: the payee data which was requested by the sender. Can be nil if no payee data was requested or is
 //			mandatory.
 func GetPayReqResponse(
@@ -526,7 +528,6 @@ func GetPayReqResponse(
 	receiverChannelUtxos []string,
 	receiverNodePubKey *string,
 	utxoCallback string,
-	receiverKycStatus KycStatus,
 	payeeData *PayeeData,
 ) (*PayReqResponse, error) {
 	msatsAmount := int64(math.Round(float64(query.Amount)*conversionRate)) + receiverFeesMillisats
@@ -540,7 +541,6 @@ func GetPayReqResponse(
 	}
 	if existingCompliance := (*payeeData)["compliance"]; existingCompliance == nil {
 		complianceData := CompliancePayeeData{
-			KycStatus:    receiverKycStatus,
 			Utxos:        receiverChannelUtxos,
 			NodePubKey:   receiverNodePubKey,
 			UtxoCallback: utxoCallback,

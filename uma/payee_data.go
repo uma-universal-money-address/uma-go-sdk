@@ -27,8 +27,6 @@ func (p *PayeeData) Compliance() (*CompliancePayeeData, error) {
 }
 
 type CompliancePayeeData struct {
-	// KycStatus indicates whether VASP2 has KYC information about the receiver.
-	KycStatus KycStatus `json:"kycStatus"`
 	// NodePubKey is the public key of the receiver's node if known.
 	NodePubKey *string `json:"nodePubKey"`
 	// Utxos is a list of UTXOs of channels over which the receiver will likely receive the payment.

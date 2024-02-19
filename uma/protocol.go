@@ -80,6 +80,8 @@ type LnurlpResponse struct {
 
 // LnurlComplianceResponse is the `compliance` field  of the LnurlpResponse.
 type LnurlComplianceResponse struct {
+	// KycStatus indicates whether VASP2 has KYC information about the receiver.
+	KycStatus KycStatus `json:"kycStatus"`
 	// Signature is the base64-encoded signature of sha256(ReceiverAddress|Nonce|Timestamp).
 	Signature string `json:"signature"`
 	// Nonce is a random string that is used to prevent replay attacks.
