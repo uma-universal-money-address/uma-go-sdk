@@ -106,13 +106,25 @@ func signPayload(payload []byte, privateKeyBytes []byte) (*string, error) {
 //	otherVaspPubKey: the bytes of the signing public key of the VASP making this request.
 //	nonceCache: the NonceCache cache to use to prevent replay attacks.
 func VerifyPayReqSignature(query *PayRequest, otherVaspPubKey []byte, nonceCache NonceCache) error {
-	err := nonceCache.CheckAndSaveNonce(
-		query.PayerData.Compliance.SignatureNonce,
-		time.Unix(query.PayerData.Compliance.SignatureTimestamp, 0))
+	complianceData, err := query.PayerData.Compliance()
 	if err != nil {
 		return err
 	}
-	return verifySignature(query.signablePayload(), query.PayerData.Compliance.Signature, otherVaspPubKey)
+	if complianceData == nil {
+		return errors.New("missing compliance data")
+	}
+	err = nonceCache.CheckAndSaveNonce(
+		complianceData.SignatureNonce,
+		time.Unix(complianceData.SignatureTimestamp, 0),
+	)
+	if err != nil {
+		return err
+	}
+	signablePayload, err := query.signablePayload()
+	if err != nil {
+		return err
+	}
+	return verifySignature(signablePayload, complianceData.Signature, otherVaspPubKey)
 }
 
 // verifySignature Verifies the signature of the uma request.
@@ -264,7 +276,7 @@ func GetLnurlpResponse(
 	encodedMetadata string,
 	minSendableSats int64,
 	maxSendableSats int64,
-	payerDataOptions PayerDataOptions,
+	payerDataOptions CounterPartyDataOptions,
 	currencyOptions []Currency,
 	receiverKycStatus KycStatus,
 ) (*LnurlpResponse, error) {
@@ -368,6 +380,7 @@ func GetVaspDomainFromUmaAddress(umaAddress string) (string, error) {
 //	 	payerNodePubKey: If known, the public key of the sender's node. If supported by the receiving VASP's compliance provider,
 //	        this will be used to pre-screen the sender's UTXOs for compliance purposes.
 //		utxoCallback: the URL that the receiver will call to send UTXOs of the channel that the receiver used to receive the payment once it completes.
+//		requestedPayeeData: the payer data options that the sender is requesting about the receiver.
 func GetPayRequest(
 	receiverEncryptionPubKey []byte,
 	sendingVaspPrivateKey []byte,
@@ -382,6 +395,7 @@ func GetPayRequest(
 	payerUtxos *[]string,
 	payerNodePubKey *string,
 	utxoCallback string,
+	requestedPayeeData *CounterPartyDataOptions,
 ) (*PayRequest, error) {
 	complianceData, err := getSignedCompliancePayerData(
 		receiverEncryptionPubKey,
@@ -402,11 +416,12 @@ func GetPayRequest(
 		CurrencyCode: currencyCode,
 		Amount:       amount,
 		PayerData: PayerData{
-			Name:       payerName,
-			Email:      payerEmail,
-			Identifier: payerIdentifier,
-			Compliance: complianceData,
+			"name":       payerName,
+			"email":      payerEmail,
+			"identifier": payerIdentifier,
+			"compliance": complianceData,
 		},
+		RequestedPayeeData: requestedPayeeData,
 	}, nil
 }
 
@@ -500,6 +515,8 @@ type UmaInvoiceCreator interface {
 //	        this will be used to pre-screen the receiver's UTXOs for compliance purposes.
 //		utxoCallback: the URL that the receiving VASP will call to send UTXOs of the channel that the receiver used to
 //	    	receive the payment once it completes.
+//		payeeData: the payee data which was requested by the sender. Can be nil if no payee data was requested or is
+//			mandatory.
 func GetPayReqResponse(
 	query *PayRequest,
 	invoiceCreator UmaInvoiceCreator,
@@ -511,6 +528,7 @@ func GetPayReqResponse(
 	receiverChannelUtxos []string,
 	receiverNodePubKey *string,
 	utxoCallback string,
+	payeeData *PayeeData,
 ) (*PayReqResponse, error) {
 	msatsAmount := int64(math.Round(float64(query.Amount)*conversionRate)) + receiverFeesMillisats
 	encodedPayerData, err := json.Marshal(query.PayerData)
@@ -521,20 +539,28 @@ func GetPayReqResponse(
 	if err != nil {
 		return nil, err
 	}
-	return &PayReqResponse{
-		EncodedInvoice: *encodedInvoice,
-		Routes:         []Route{},
-		Compliance: PayReqResponseCompliance{
+	if existingCompliance := (*payeeData)["compliance"]; existingCompliance == nil {
+		complianceData := CompliancePayeeData{
 			Utxos:        receiverChannelUtxos,
 			NodePubKey:   receiverNodePubKey,
 			UtxoCallback: utxoCallback,
-		},
+		}
+		complianceDataAsMap, err := complianceData.AsMap()
+		if err != nil {
+			return nil, err
+		}
+		(*payeeData)["compliance"] = complianceDataAsMap
+	}
+	return &PayReqResponse{
+		EncodedInvoice: *encodedInvoice,
+		Routes:         []Route{},
 		PaymentInfo: PayReqResponsePaymentInfo{
 			CurrencyCode:             currencyCode,
 			Multiplier:               conversionRate,
 			Decimals:                 currencyDecimals,
 			ExchangeFeesMillisatoshi: receiverFeesMillisats,
 		},
+		PayeeData: payeeData,
 	}, nil
 }
 

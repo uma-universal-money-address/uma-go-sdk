@@ -151,10 +151,10 @@ func TestSignAndVerifyLnurlpResponse(t *testing.T) {
 		metadata,
 		1,
 		10_000_000,
-		uma.PayerDataOptions{
-			NameRequired:       false,
-			EmailRequired:      false,
-			ComplianceRequired: true,
+		uma.CounterPartyDataOptions{
+			"name":       uma.CounterPartyDataOption{Mandatory: false},
+			"email":      uma.CounterPartyDataOption{Mandatory: false},
+			"compliance": uma.CounterPartyDataOption{Mandatory: true},
 		},
 		[]uma.Currency{
 			{
@@ -205,6 +205,7 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 		nil,
 		nil,
 		"/api/lnurl/utxocallback?txid=1234",
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -217,9 +218,11 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 	err = uma.VerifyPayReqSignature(payreq, senderSigningPrivateKey.PubKey().SerializeUncompressed(), getNonceCache())
 	require.NoError(t, err)
 
-	require.Equal(t, payreq.PayerData.Compliance.TravelRuleFormat, &trFormat)
+	complianceData, err := payreq.PayerData.Compliance()
+	require.NoError(t, err)
+	require.Equal(t, complianceData.TravelRuleFormat, &trFormat)
 
-	encryptedTrInfo := payreq.PayerData.Compliance.EncryptedTravelRuleInfo
+	encryptedTrInfo := complianceData.EncryptedTravelRuleInfo
 	require.NotNil(t, encryptedTrInfo)
 
 	encryptedTrInfoBytes, err := hex.DecodeString(*encryptedTrInfo)
@@ -244,6 +247,14 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 	require.NoError(t, err)
 
 	trInfo := "some TR info for VASP2"
+	payeeOptions := uma.CounterPartyDataOptions{
+		"identifier": uma.CounterPartyDataOption{
+			Mandatory: true,
+		},
+		"name": uma.CounterPartyDataOption{
+			Mandatory: false,
+		},
+	}
 	payreq, err := uma.GetPayRequest(
 		receiverEncryptionPrivateKey.PubKey().SerializeUncompressed(),
 		senderSigningPrivateKey.Serialize(),
@@ -258,11 +269,15 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 		nil,
 		nil,
 		"/api/lnurl/utxocallback?txid=1234",
+		&payeeOptions,
 	)
 	require.NoError(t, err)
 	client := &FakeInvoiceCreator{}
 	metadata, err := createMetadataForBob()
 	require.NoError(t, err)
+	payeeData := uma.PayeeData{
+		"identifier": "$alice@vasp1.com",
+	}
 	payreqResponse, err := uma.GetPayReqResponse(
 		payreq,
 		client,
@@ -274,6 +289,7 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 		[]string{"abcdef12345"},
 		nil,
 		"/api/lnurl/utxocallback?txid=1234",
+		&payeeData,
 	)
 	require.NoError(t, err)
 

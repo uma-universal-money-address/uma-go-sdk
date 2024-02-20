@@ -6,52 +6,51 @@ import (
 	"strings"
 )
 
-type PayerDataOptions struct {
-	NameRequired       bool
-	EmailRequired      bool
-	ComplianceRequired bool
+type PayerData map[string]interface{}
+
+func (p *PayerData) Compliance() (*CompliancePayerData, error) {
+	if p == nil {
+		return nil, nil
+	}
+	if compliance, ok := (*p)["compliance"]; ok {
+		if complianceMap, ok := compliance.(map[string]interface{}); ok {
+			complianceJson, err := json.Marshal(complianceMap)
+			if err != nil {
+				return nil, err
+			}
+			var complianceData CompliancePayerData
+			err = json.Unmarshal(complianceJson, &complianceData)
+			if err != nil {
+				return nil, err
+			}
+			return &complianceData, nil
+		}
+	}
+	return nil, nil
 }
 
-func (p *PayerDataOptions) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf(`{
-		"identifier": { "mandatory": true },
-		"name": { "mandatory": %t },
-		"email": { "mandatory": %t },
-		"compliance": { "mandatory": %t }
-	}`, p.NameRequired, p.EmailRequired, p.ComplianceRequired)), nil
-}
-
-func decodePayerDataOptionField(data map[string]interface{}, fieldName string) bool {
-	m, ok := data[fieldName].(map[string]interface{})
-	if !ok {
-		return false
+func (p *PayerData) stringField(field string) *string {
+	if p == nil {
+		return nil
 	}
-	mandatory, ok := m["mandatory"].(bool)
-	if !ok {
-		return false
+	if value, ok := (*p)[field]; ok {
+		if stringValue, ok := value.(string); ok {
+			return &stringValue
+		}
 	}
-	return mandatory
-}
-
-func (p *PayerDataOptions) UnmarshalJSON(data []byte) error {
-	var m map[string]interface{}
-	err := json.Unmarshal(data, &m)
-	if err != nil {
-		return err
-	}
-
-	p.NameRequired = decodePayerDataOptionField(m, "name")
-	p.EmailRequired = decodePayerDataOptionField(m, "email")
-	p.ComplianceRequired = decodePayerDataOptionField(m, "compliance")
-
 	return nil
 }
 
-type PayerData struct {
-	Name       *string              `json:"name"`
-	Email      *string              `json:"email"`
-	Identifier string               `json:"identifier"`
-	Compliance *CompliancePayerData `json:"compliance"`
+func (p *PayerData) Identifier() *string {
+	return p.stringField("identifier")
+}
+
+func (p *PayerData) Name() *string {
+	return p.stringField("name")
+}
+
+func (p *PayerData) Email() *string {
+	return p.stringField("email")
 }
 
 type TravelRuleFormat struct {
