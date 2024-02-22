@@ -555,6 +555,9 @@ func GetPayReqResponse(
 		receiverNodePubKey,
 		utxoCallback,
 	)
+	if err != nil {
+		return nil, err
+	}
 	if existingCompliance := (*payeeData)["compliance"]; existingCompliance == nil {
 		complianceDataAsMap, err := complianceData.AsMap()
 		if err != nil {
@@ -595,9 +598,9 @@ func getSignedCompliancePayeeData(
 	}
 
 	return &CompliancePayeeData{
-		Utxos:        		receiverChannelUtxos,
-		NodePubKey:   		receiverNodePubKey,
-		UtxoCallback: 		utxoCallback,
+		Utxos:              receiverChannelUtxos,
+		NodePubKey:         receiverNodePubKey,
+		UtxoCallback:       utxoCallback,
 		Signature:          *signature,
 		SignatureNonce:     *nonce,
 		SignatureTimestamp: timestamp,
@@ -622,6 +625,8 @@ func ParsePayReqResponse(bytes []byte) (*PayReqResponse, error) {
 //	response: the signed response to verify.
 //	otherVaspPubKey: the bytes of the signing public key of the VASP making this request.
 //	nonceCache: the NonceCache cache to use to prevent replay attacks.
+//	payerIdentifier: the identifier of the sender. For example, $alice@vasp1.com
+//	payeeIdentifier: the identifier of the receiver. For example, $bob@vasp2.com
 func VerifyPayReqResponseSignature(
 	response *PayReqResponse,
 	otherVaspPubKey []byte,
