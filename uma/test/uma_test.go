@@ -309,7 +309,7 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 		receiverSigningPrivateKey.PubKey().SerializeUncompressed(),
 		getNonceCache(),
 		"$alice@vasp1.com",
-		"$bob@vasp2.com"
+		"$bob@vasp2.com",
 	)
 	require.NoError(t, err)
 }
