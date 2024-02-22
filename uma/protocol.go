@@ -178,21 +178,15 @@ type PayReqResponsePaymentInfo struct {
 	ExchangeFeesMillisatoshi int64 `json:"exchangeFeesMillisatoshi"`
 }
 
-func (r *PayReqResponse) signablePayload(payerIdentifier string, payeeIdentifier string) ([]byte, error) {
-	complianceData, err := r.PayeeData.Compliance()
-	if err != nil {
-		return nil, err
-	}
-	if complianceData == nil {
+func (c *CompliancePayeeData) signablePayload(payerIdentifier string, payeeIdentifier string) ([]byte, error) {
+	if c == nil {
 		return nil, errors.New("compliance data is missing")
 	}
-	signatureNonce := complianceData.SignatureNonce
-	signatureTimestamp := complianceData.SignatureTimestamp
 	payloadString := strings.Join([]string{
 		payerIdentifier,
 		payeeIdentifier,
-		signatureNonce,
-		strconv.FormatInt(signatureTimestamp, 10),
+		c.SignatureNonce,
+		strconv.FormatInt(c.SignatureTimestamp, 10),
 	}, "|")
 	return []byte(payloadString), nil
 }

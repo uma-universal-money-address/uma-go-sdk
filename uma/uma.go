@@ -591,20 +591,24 @@ func getSignedCompliancePayeeData(
 	if err != nil {
 		return nil, err
 	}
-	payloadString := strings.Join([]string{payerIdentifier, payeeIdentifier, *nonce, strconv.FormatInt(timestamp, 10)}, "|")
+	complianceData := CompliancePayeeData{
+		Utxos:              receiverChannelUtxos,
+		NodePubKey:         receiverNodePubKey,
+		UtxoCallback:       utxoCallback,
+		Signature:          "",
+		SignatureNonce:     *nonce,
+		SignatureTimestamp: timestamp,
+	}
+	payloadString, err := complianceData.signablePayload(payerIdentifier, payeeIdentifier)
+	if err != nil {
+		return nil, err
+	}
 	signature, err := signPayload([]byte(payloadString), receivingVaspPrivateKeyBytes)
 	if err != nil {
 		return nil, err
 	}
-
-	return &CompliancePayeeData{
-		Utxos:              receiverChannelUtxos,
-		NodePubKey:         receiverNodePubKey,
-		UtxoCallback:       utxoCallback,
-		Signature:          *signature,
-		SignatureNonce:     *nonce,
-		SignatureTimestamp: timestamp,
-	}, nil
+	complianceData.Signature = *signature
+	return &complianceData, nil
 }
 
 // ParsePayReqResponse Parses the uma pay request response from a raw response body.
@@ -648,7 +652,7 @@ func VerifyPayReqResponseSignature(
 	if err != nil {
 		return err
 	}
-	signablePayload, err := response.signablePayload(payerIdentifier, payeeIdentifier)
+	signablePayload, err := complianceData.signablePayload(payerIdentifier, payeeIdentifier)
 	if err != nil {
 		return err
 	}
