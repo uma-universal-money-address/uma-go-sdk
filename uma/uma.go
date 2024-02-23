@@ -517,6 +517,8 @@ type UmaInvoiceCreator interface {
 //	    	receive the payment once it completes.
 //		payeeData: the payee data which was requested by the sender. Can be nil if no payee data was requested or is
 //			mandatory.
+//		receivingVaspPrivateKey: the private key of the VASP that is receiving the payment. This will be used to sign the request.
+//		payeeIdentifier: the identifier of the receiver. For example, $bob@vasp2.com
 func GetPayReqResponse(
 	query *PayRequest,
 	invoiceCreator UmaInvoiceCreator,
@@ -529,6 +531,8 @@ func GetPayReqResponse(
 	receiverNodePubKey *string,
 	utxoCallback string,
 	payeeData *PayeeData,
+	receivingVaspPrivateKey []byte,
+	payeeIdentifier string,
 ) (*PayReqResponse, error) {
 	msatsAmount := int64(math.Round(float64(query.Amount)*conversionRate)) + receiverFeesMillisats
 	encodedPayerData, err := json.Marshal(query.PayerData)
@@ -539,12 +543,22 @@ func GetPayReqResponse(
 	if err != nil {
 		return nil, err
 	}
+	payerIdentifier := query.PayerData.Identifier()
+	if payerIdentifier == nil || *payerIdentifier == "" {
+		return nil, errors.New("payer data is missing")
+	}
+	complianceData, err := getSignedCompliancePayeeData(
+		receivingVaspPrivateKey,
+		*payerIdentifier,
+		payeeIdentifier,
+		receiverChannelUtxos,
+		receiverNodePubKey,
+		utxoCallback,
+	)
+	if err != nil {
+		return nil, err
+	}
 	if existingCompliance := (*payeeData)["compliance"]; existingCompliance == nil {
-		complianceData := CompliancePayeeData{
-			Utxos:        receiverChannelUtxos,
-			NodePubKey:   receiverNodePubKey,
-			UtxoCallback: utxoCallback,
-		}
 		complianceDataAsMap, err := complianceData.AsMap()
 		if err != nil {
 			return nil, err
@@ -564,6 +578,39 @@ func GetPayReqResponse(
 	}, nil
 }
 
+func getSignedCompliancePayeeData(
+	receivingVaspPrivateKeyBytes []byte,
+	payerIdentifier string,
+	payeeIdentifier string,
+	receiverChannelUtxos []string,
+	receiverNodePubKey *string,
+	utxoCallback string,
+) (*CompliancePayeeData, error) {
+	timestamp := time.Now().Unix()
+	nonce, err := GenerateNonce()
+	if err != nil {
+		return nil, err
+	}
+	complianceData := CompliancePayeeData{
+		Utxos:              receiverChannelUtxos,
+		NodePubKey:         receiverNodePubKey,
+		UtxoCallback:       utxoCallback,
+		Signature:          "",
+		SignatureNonce:     *nonce,
+		SignatureTimestamp: timestamp,
+	}
+	payloadString, err := complianceData.signablePayload(payerIdentifier, payeeIdentifier)
+	if err != nil {
+		return nil, err
+	}
+	signature, err := signPayload([]byte(payloadString), receivingVaspPrivateKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+	complianceData.Signature = *signature
+	return &complianceData, nil
+}
+
 // ParsePayReqResponse Parses the uma pay request response from a raw response body.
 func ParsePayReqResponse(bytes []byte) (*PayReqResponse, error) {
 	var response PayReqResponse
@@ -572,4 +619,42 @@ func ParsePayReqResponse(bytes []byte) (*PayReqResponse, error) {
 		return nil, err
 	}
 	return &response, nil
+}
+
+// VerifyPayReqResponseSignature Verifies the signature on an uma pay request response based on the public key of the
+// VASP making the request.
+//
+// Args:
+//
+//	response: the signed response to verify.
+//	otherVaspPubKey: the bytes of the signing public key of the VASP making this request.
+//	nonceCache: the NonceCache cache to use to prevent replay attacks.
+//	payerIdentifier: the identifier of the sender. For example, $alice@vasp1.com
+//	payeeIdentifier: the identifier of the receiver. For example, $bob@vasp2.com
+func VerifyPayReqResponseSignature(
+	response *PayReqResponse,
+	otherVaspPubKey []byte,
+	nonceCache NonceCache,
+	payerIdentifier string,
+	payeeIdentifier string,
+) error {
+	complianceData, err := response.PayeeData.Compliance()
+	if err != nil {
+		return err
+	}
+	if complianceData == nil {
+		return errors.New("missing compliance data")
+	}
+	err = nonceCache.CheckAndSaveNonce(
+		complianceData.SignatureNonce,
+		time.Unix(complianceData.SignatureTimestamp, 0),
+	)
+	if err != nil {
+		return err
+	}
+	signablePayload, err := complianceData.signablePayload(payerIdentifier, payeeIdentifier)
+	if err != nil {
+		return err
+	}
+	return verifySignature(signablePayload, complianceData.Signature, otherVaspPubKey)
 }

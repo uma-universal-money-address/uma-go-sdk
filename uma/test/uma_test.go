@@ -245,6 +245,8 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 	require.NoError(t, err)
 	receiverEncryptionPrivateKey, err := secp256k1.GeneratePrivateKey()
 	require.NoError(t, err)
+	receiverSigningPrivateKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err)
 
 	trInfo := "some TR info for VASP2"
 	payeeOptions := uma.CounterPartyDataOptions{
@@ -276,7 +278,7 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 	metadata, err := createMetadataForBob()
 	require.NoError(t, err)
 	payeeData := uma.PayeeData{
-		"identifier": "$alice@vasp1.com",
+		"identifier": "$bob@vasp2.com",
 	}
 	payreqResponse, err := uma.GetPayReqResponse(
 		payreq,
@@ -290,6 +292,8 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 		nil,
 		"/api/lnurl/utxocallback?txid=1234",
 		&payeeData,
+		receiverSigningPrivateKey.Serialize(),
+		"$bob@vasp2.com",
 	)
 	require.NoError(t, err)
 
@@ -299,6 +303,15 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 	parsedResponse, err := uma.ParsePayReqResponse(payreqResponseJson)
 	require.NoError(t, err)
 	require.Equal(t, payreqResponse, parsedResponse)
+
+	err = uma.VerifyPayReqResponseSignature(
+		parsedResponse,
+		receiverSigningPrivateKey.PubKey().SerializeUncompressed(),
+		getNonceCache(),
+		"$alice@vasp1.com",
+		"$bob@vasp2.com",
+	)
+	require.NoError(t, err)
 }
 
 func createLnurlpRequest(t *testing.T, signingPrivateKey []byte) *uma.LnurlpRequest {

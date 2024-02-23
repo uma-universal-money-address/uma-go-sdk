@@ -178,6 +178,19 @@ type PayReqResponsePaymentInfo struct {
 	ExchangeFeesMillisatoshi int64 `json:"exchangeFeesMillisatoshi"`
 }
 
+func (c *CompliancePayeeData) signablePayload(payerIdentifier string, payeeIdentifier string) ([]byte, error) {
+	if c == nil {
+		return nil, errors.New("compliance data is missing")
+	}
+	payloadString := strings.Join([]string{
+		payerIdentifier,
+		payeeIdentifier,
+		c.SignatureNonce,
+		strconv.FormatInt(c.SignatureTimestamp, 10),
+	}, "|")
+	return []byte(payloadString), nil
+}
+
 // PubKeyResponse is sent from a VASP to another VASP to provide its public keys.
 // It is the response to GET requests at `/.well-known/lnurlpubkey`.
 type PubKeyResponse struct {
