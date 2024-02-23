@@ -416,10 +416,10 @@ func GetPayRequest(
 		CurrencyCode: currencyCode,
 		Amount:       amount,
 		PayerData: PayerData{
-			"name":       payerName,
-			"email":      payerEmail,
-			"identifier": payerIdentifier,
-			"compliance": complianceData,
+			CounterPartyDataFieldName.String():       payerName,
+			CounterPartyDataFieldEmail.String():      payerEmail,
+			CounterPartyDataFieldIdentifier.String(): payerIdentifier,
+			CounterPartyDataFieldCompliance.String(): complianceData,
 		},
 		RequestedPayeeData: requestedPayeeData,
 	}, nil
@@ -516,7 +516,7 @@ type UmaInvoiceCreator interface {
 //		utxoCallback: the URL that the receiving VASP will call to send UTXOs of the channel that the receiver used to
 //	    	receive the payment once it completes.
 //		payeeData: the payee data which was requested by the sender. Can be nil if no payee data was requested or is
-//			mandatory.
+//			mandatory. The data provided does not need to include compliance data, as it will be added automatically.
 //		receivingVaspPrivateKey: the private key of the VASP that is receiving the payment. This will be used to sign the request.
 //		payeeIdentifier: the identifier of the receiver. For example, $bob@vasp2.com
 func GetPayReqResponse(
@@ -558,12 +558,17 @@ func GetPayReqResponse(
 	if err != nil {
 		return nil, err
 	}
-	if existingCompliance := (*payeeData)["compliance"]; existingCompliance == nil {
+	if payeeData == nil {
+		payeeData = &PayeeData{
+			CounterPartyDataFieldIdentifier.String(): payerIdentifier,
+		}
+	}
+	if existingCompliance := (*payeeData)[CounterPartyDataFieldCompliance.String()]; existingCompliance == nil {
 		complianceDataAsMap, err := complianceData.AsMap()
 		if err != nil {
 			return nil, err
 		}
-		(*payeeData)["compliance"] = complianceDataAsMap
+		(*payeeData)[CounterPartyDataFieldCompliance.String()] = complianceDataAsMap
 	}
 	return &PayReqResponse{
 		EncodedInvoice: *encodedInvoice,

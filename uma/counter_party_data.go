@@ -18,3 +18,7 @@ const (
 	CounterPartyDataFieldCompliance    CounterPartyDataField = "compliance"
 	CounterPartyDataFieldAccountNumber CounterPartyDataField = "accountNumber"
 )
+
+func (c CounterPartyDataField) String() string {
+	return string(c)
+}
