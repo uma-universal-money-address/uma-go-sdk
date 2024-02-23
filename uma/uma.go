@@ -290,6 +290,10 @@ func GetLnurlpResponse(
 		return nil, err
 	}
 
+	// UMA always requires compliance and identifier fields:
+	payerDataOptions[CounterPartyDataFieldCompliance.String()] = CounterPartyDataOption{Mandatory: true}
+	payerDataOptions[CounterPartyDataFieldIdentifier.String()] = CounterPartyDataOption{Mandatory: true}
+
 	return &LnurlpResponse{
 		Tag:               "payRequest",
 		Callback:          callback,
@@ -411,6 +415,12 @@ func GetPayRequest(
 	if err != nil {
 		return nil, err
 	}
+	if requestedPayeeData == nil {
+		requestedPayeeData = &CounterPartyDataOptions{}
+	}
+	// UMA always requires compliance and identifier fields:
+	(*requestedPayeeData)[CounterPartyDataFieldCompliance.String()] = CounterPartyDataOption{Mandatory: true}
+	(*requestedPayeeData)[CounterPartyDataFieldIdentifier.String()] = CounterPartyDataOption{Mandatory: true}
 
 	return &PayRequest{
 		CurrencyCode: currencyCode,
