@@ -691,7 +691,7 @@ func GetPostTransactionCallback(
 		return nil, err
 	}
 	unsignedCallback := PostTransactionCallback{
-		Utxos:		utxos,
+		Utxos:      utxos,
 		VaspDomain: vaspDomain,
 		Timestamp:  time.Now().Unix(),
 		Nonce:      *nonce,
