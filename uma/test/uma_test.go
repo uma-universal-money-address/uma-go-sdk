@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/uma-universal-money-address/uma-go-sdk/uma"
+	"math"
 	"net/url"
 	"strconv"
 	"testing"
@@ -162,9 +163,11 @@ func TestSignAndVerifyLnurlpResponse(t *testing.T) {
 				Name:                "US Dollar",
 				Symbol:              "$",
 				MillisatoshiPerUnit: 34_150,
-				MinSendable:         1,
-				MaxSendable:         10_000_000,
-				Decimals:            2,
+				Convertible: uma.ConvertibleCurrency{
+					MinSendable: 1,
+					MaxSendable: 10_000_000,
+				},
+				Decimals: 2,
 			},
 		},
 		uma.KycStatusVerified,
@@ -195,6 +198,7 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 		receiverEncryptionPrivateKey.PubKey().SerializeUncompressed(),
 		senderSigningPrivateKey.Serialize(),
 		"USD",
+		true,
 		1000,
 		"$alice@vasp1.com",
 		nil,
@@ -211,6 +215,13 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 
 	payreqJson, err := json.Marshal(payreq)
 	require.NoError(t, err)
+
+	// Verify the encoding format:
+	parsedJsonMap := make(map[string]interface{})
+	err = json.Unmarshal(payreqJson, &parsedJsonMap)
+	require.NoError(t, err)
+	require.Equal(t, parsedJsonMap["amount"], "1000.USD")
+	require.Equal(t, parsedJsonMap["convert"], "USD")
 
 	payreq, err = uma.ParsePayRequest(payreqJson)
 	require.NoError(t, err)
@@ -231,6 +242,52 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 	decryptedTrInfo, err := eciesgo.Decrypt(eciesPrivKey, encryptedTrInfoBytes)
 	require.NoError(t, err)
 	assert.Equal(t, trInfo, string(decryptedTrInfo))
+}
+
+func TestMsatsPayReqCreationAndParsing(t *testing.T) {
+	senderSigningPrivateKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err)
+	receiverEncryptionPrivateKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err)
+
+	trInfo := "some TR info for VASP2"
+	ivmsVersion := "101.1"
+	trFormat := uma.TravelRuleFormat{
+		Type:    "IVMS",
+		Version: &ivmsVersion,
+	}
+	payreq, err := uma.GetPayRequest(
+		receiverEncryptionPrivateKey.PubKey().SerializeUncompressed(),
+		senderSigningPrivateKey.Serialize(),
+		"USD",
+		false,
+		1000,
+		"$alice@vasp1.com",
+		nil,
+		nil,
+		&trInfo,
+		&trFormat,
+		uma.KycStatusVerified,
+		nil,
+		nil,
+		"/api/lnurl/utxocallback?txid=1234",
+		nil,
+	)
+	require.NoError(t, err)
+
+	payreqJson, err := json.Marshal(payreq)
+	require.NoError(t, err)
+
+	// Verify the encoding format:
+	parsedJsonMap := make(map[string]interface{})
+	err = json.Unmarshal(payreqJson, &parsedJsonMap)
+	require.NoError(t, err)
+	require.Equal(t, parsedJsonMap["amount"], "1000")
+	require.Equal(t, parsedJsonMap["convert"], "USD")
+
+	payreq, err = uma.ParsePayRequest(payreqJson)
+	require.NoError(t, err)
+	require.NotNil(t, payreq)
 }
 
 type FakeInvoiceCreator struct{}
@@ -261,6 +318,7 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 		receiverEncryptionPrivateKey.PubKey().SerializeUncompressed(),
 		senderSigningPrivateKey.Serialize(),
 		"USD",
+		true,
 		1000,
 		"$alice@vasp1.com",
 		nil,
@@ -296,6 +354,88 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 		"$bob@vasp2.com",
 	)
 	require.NoError(t, err)
+	require.Equal(t, payreqResponse.PaymentInfo.Amount, payreq.Amount)
+	require.Equal(t, payreqResponse.PaymentInfo.CurrencyCode, payreq.ReceivingCurrencyCode)
+
+	payreqResponseJson, err := json.Marshal(payreqResponse)
+	require.NoError(t, err)
+
+	parsedResponse, err := uma.ParsePayReqResponse(payreqResponseJson)
+	require.NoError(t, err)
+	require.Equal(t, payreqResponse, parsedResponse)
+
+	err = uma.VerifyPayReqResponseSignature(
+		parsedResponse,
+		receiverSigningPrivateKey.PubKey().SerializeUncompressed(),
+		getNonceCache(),
+		"$alice@vasp1.com",
+		"$bob@vasp2.com",
+	)
+	require.NoError(t, err)
+}
+
+func TestMsatsPayReqResponseAndParsing(t *testing.T) {
+	senderSigningPrivateKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err)
+	receiverEncryptionPrivateKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err)
+	receiverSigningPrivateKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err)
+
+	trInfo := "some TR info for VASP2"
+	payeeOptions := uma.CounterPartyDataOptions{
+		"identifier": uma.CounterPartyDataOption{
+			Mandatory: true,
+		},
+		"name": uma.CounterPartyDataOption{
+			Mandatory: false,
+		},
+	}
+	payreq, err := uma.GetPayRequest(
+		receiverEncryptionPrivateKey.PubKey().SerializeUncompressed(),
+		senderSigningPrivateKey.Serialize(),
+		"USD",
+		false,
+		1_000_000,
+		"$alice@vasp1.com",
+		nil,
+		nil,
+		&trInfo,
+		nil,
+		uma.KycStatusVerified,
+		nil,
+		nil,
+		"/api/lnurl/utxocallback?txid=1234",
+		&payeeOptions,
+	)
+	require.NoError(t, err)
+	client := &FakeInvoiceCreator{}
+	metadata, err := createMetadataForBob()
+	require.NoError(t, err)
+	payeeData := uma.PayeeData{
+		"identifier": "$bob@vasp2.com",
+	}
+	fee := int64(100_000)
+	conversionRate := float64(24_150)
+	payreqResponse, err := uma.GetPayReqResponse(
+		payreq,
+		client,
+		metadata,
+		"USD",
+		2,
+		conversionRate,
+		fee,
+		[]string{"abcdef12345"},
+		nil,
+		"/api/lnurl/utxocallback?txid=1234",
+		&payeeData,
+		receiverSigningPrivateKey.Serialize(),
+		"$bob@vasp2.com",
+	)
+	require.NoError(t, err)
+	expectedAmount := int64(math.Round(float64(payreq.Amount-fee) / conversionRate))
+	require.Equal(t, payreqResponse.PaymentInfo.Amount, expectedAmount)
+	require.Equal(t, payreqResponse.PaymentInfo.CurrencyCode, payreq.ReceivingCurrencyCode)
 
 	payreqResponseJson, err := json.Marshal(payreqResponse)
 	require.NoError(t, err)
