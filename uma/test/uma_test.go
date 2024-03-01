@@ -314,7 +314,7 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestSignAndVerifyPostTransactionCallbac(t *testing.T) {
+func TestSignAndVerifyPostTransactionCallback(t *testing.T) {
 	signingPrivateKey, err := secp256k1.GeneratePrivateKey()
 	require.NoError(t, err)
 	callback, err := uma.GetPostTransactionCallback(
