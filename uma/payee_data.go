@@ -34,11 +34,11 @@ type CompliancePayeeData struct {
 	// UtxoCallback is the URL that the sender VASP will call to send UTXOs of the channel that the sender used to send the payment once it completes.
 	UtxoCallback string `json:"utxoCallback"`
 	// Signature is the base64-encoded signature of sha256(SenderAddress|ReceiverAddress|Nonce|Timestamp).
-	Signature          string `json:"signature"`
+	Signature string `json:"signature"`
 	// Nonce is a random string that is used to prevent replay attacks.
-	SignatureNonce     string `json:"signatureNonce"`
+	SignatureNonce string `json:"signatureNonce"`
 	// Timestamp is the unix timestamp (in seconds since epoch) of when the request was sent. Used in the signature.
-	SignatureTimestamp int64  `json:"signatureTimestamp"`
+	SignatureTimestamp int64 `json:"signatureTimestamp"`
 }
 
 func (c *CompliancePayeeData) AsMap() (map[string]interface{}, error) {
