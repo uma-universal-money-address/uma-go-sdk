@@ -694,3 +694,63 @@ func VerifyPayReqResponseSignature(
 	}
 	return verifySignature(signablePayload, complianceData.Signature, otherVaspPubKey)
 }
+
+// GetPostTransactionCallback Creates a signed post transaction callback.
+//
+// Args:
+//
+//	utxos: UTXOs of the channels of the VASP initiating the callback.
+//	vaspDomain: the domain of the VASP initiating the callback.
+//	signingPrivateKey: the private key of the VASP initiating the callback. This will be used to sign the request.
+func GetPostTransactionCallback(
+	utxos []UtxoWithAmount,
+	vaspDomain string,
+	signingPrivateKey []byte,
+) (*PostTransactionCallback, error) {
+	nonce, err := GenerateNonce()
+	if err != nil {
+		return nil, err
+	}
+	unsignedCallback := PostTransactionCallback{
+		Utxos:      utxos,
+		VaspDomain: vaspDomain,
+		Timestamp:  time.Now().Unix(),
+		Nonce:      *nonce,
+	}
+	signature, err := signPayload(unsignedCallback.signablePayload(), signingPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+	unsignedCallback.Signature = *signature
+	return &unsignedCallback, nil
+}
+
+func ParsePostTransactionCallback(bytes []byte) (*PostTransactionCallback, error) {
+	var callback PostTransactionCallback
+	err := json.Unmarshal(bytes, &callback)
+	if err != nil {
+		return nil, err
+	}
+	return &callback, nil
+}
+
+// VerifyPostTransactionCallbackSignature Verifies the signature on a post transaction callback based on the
+// public key of the counterparty VASP.
+//
+// Args:
+//
+//	callback: the signed callback to verify.
+//	otherVaspPubKey: the bytes of the signing public key of the VASP making this request.
+//	nonceCache: the NonceCache cache to use to prevent replay attacks.
+func VerifyPostTransactionCallbackSignature(
+	callback *PostTransactionCallback,
+	otherVaspPubKey []byte,
+	nonceCache NonceCache,
+) error {
+	err := nonceCache.CheckAndSaveNonce(callback.Nonce, time.Unix(callback.Timestamp, 0))
+	if err != nil {
+		return err
+	}
+	signablePayload := callback.signablePayload()
+	return verifySignature(signablePayload, callback.Signature, otherVaspPubKey)
+}

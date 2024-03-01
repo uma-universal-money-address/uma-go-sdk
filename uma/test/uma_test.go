@@ -454,6 +454,23 @@ func TestMsatsPayReqResponseAndParsing(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestSignAndVerifyPostTransactionCallback(t *testing.T) {
+	signingPrivateKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err)
+	callback, err := uma.GetPostTransactionCallback(
+		[]uma.UtxoWithAmount{{Utxo: "abcdef12345", Amount: 1000}},
+		"my-vasp.com",
+		signingPrivateKey.Serialize(),
+	)
+	require.NoError(t, err)
+	callbackJson, err := json.Marshal(callback)
+	require.NoError(t, err)
+	parsedCallback, err := uma.ParsePostTransactionCallback(callbackJson)
+	require.NoError(t, err)
+	err = uma.VerifyPostTransactionCallbackSignature(parsedCallback, signingPrivateKey.PubKey().SerializeUncompressed(), getNonceCache())
+	require.NoError(t, err)
+}
+
 func createLnurlpRequest(t *testing.T, signingPrivateKey []byte) *uma.LnurlpRequest {
 	queryUrl, err := uma.GetSignedLnurlpRequestUrl(signingPrivateKey, "$bob@vasp2.com", "vasp1.com", true, nil)
 	require.NoError(t, err)
