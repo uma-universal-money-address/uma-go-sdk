@@ -105,14 +105,114 @@ func (r *LnurlpResponse) signablePayload() []byte {
 
 // PayRequest is the request sent by the sender to the receiver to retrieve an invoice.
 type PayRequest struct {
-	// CurrencyCode is the ISO 3-digit currency code that the receiver will receive for this payment.
-	CurrencyCode string `json:"currency"`
-	// Amount is the amount that the receiver will receive for this payment in the smallest unit of the specified currency (i.e. cents for USD).
+	// SendingAmountCurrencyCode is the currency code of the `amount` field. `nil` indicates that `amount` is in
+	// millisatoshis as in LNURL without LUD-21. If this is not `nil`, then `amount` is in the smallest unit of the
+	// specified currency (e.g. cents for USD). This currency code can be any currency which the receiver can quote.
+	// However, there are two most common scenarios for UMA:
+	//
+	// 1. If the sender wants the receiver wants to receive a specific amount in their receiving
+	// currency, then this field should be the same as `receiving_currency_code`. This is useful
+	// for cases where the sender wants to ensure that the receiver receives a specific amount
+	// in that destination currency, regardless of the exchange rate, for example, when paying
+	// for some goods or services in a foreign currency.
+	//
+	// 2. If the sender has a specific amount in their own currency that they would like to send,
+	// then this field should be left as `None` to indicate that the amount is in millisatoshis.
+	// This will lock the sent amount on the sender side, and the receiver will receive the
+	// equivalent amount in their receiving currency. NOTE: In this scenario, the sending VASP
+	// *should not* pass the sending currency code here, as it is not relevant to the receiver.
+	// Rather, by specifying an invoice amount in msats, the sending VASP can ensure that their
+	// user will be sending a fixed amount, regardless of the exchange rate on the receiving side.
+	SendingAmountCurrencyCode *string `json:"sendingAmountCurrencyCode"`
+	// ReceivingCurrencyCode is the ISO 3-digit currency code that the receiver will receive for this payment.
+	ReceivingCurrencyCode string `json:"convert"`
+	// Amount is the amount that the receiver will receive for this payment in the smallest unit of the specified
+	// currency (i.e. cents for USD) if `SendingAmountCurrencyCode` is not `nil`. Otherwise, it is the amount in
+	// millisatoshis.
 	Amount int64 `json:"amount"`
 	// PayerData is the data that the sender will send to the receiver to identify themselves.
 	PayerData PayerData `json:"payerData"`
 	// RequestedPayeeData is the data that the sender is requesting about the payee.
 	RequestedPayeeData *CounterPartyDataOptions `json:"payeeData"`
+}
+
+func (p *PayRequest) MarshalJSON() ([]byte, error) {
+	amount := strconv.FormatInt(p.Amount, 10)
+	if p.SendingAmountCurrencyCode != nil {
+		amount = fmt.Sprintf("%s.%s", amount, *p.SendingAmountCurrencyCode)
+	}
+	payerDataJson, err := json.Marshal(p.PayerData)
+	if err != nil {
+		return nil, err
+	}
+	reqStr := fmt.Sprintf(`{
+		"convert": "%s",
+		"amount": "%s",
+		"payerData": %s`, p.ReceivingCurrencyCode, amount, payerDataJson)
+	if p.RequestedPayeeData != nil {
+		payeeDataJson, err := json.Marshal(p.RequestedPayeeData)
+		if err != nil {
+			return nil, err
+		}
+		reqStr += fmt.Sprintf(`,
+		"payeeData": %s`, payeeDataJson)
+	}
+	reqStr += "}"
+	return []byte(reqStr), nil
+}
+
+func (p *PayRequest) UnmarshalJSON(data []byte) error {
+	var rawReq map[string]interface{}
+	err := json.Unmarshal(data, &rawReq)
+	if err != nil {
+		return err
+	}
+	convert, ok := rawReq["convert"].(string)
+	if !ok {
+		return errors.New("missing or invalid convert field")
+	}
+	p.ReceivingCurrencyCode = convert
+	amount, ok := rawReq["amount"].(string)
+	if !ok {
+		return errors.New("missing or invalid amount field")
+	}
+	amountParts := strings.Split(amount, ".")
+	if len(amountParts) > 2 {
+		return errors.New("invalid amount field")
+	}
+	p.Amount, err = strconv.ParseInt(amountParts[0], 10, 64)
+	if err != nil {
+		return err
+	}
+	if len(amountParts) == 2 && len(amountParts[1]) > 0 {
+		p.SendingAmountCurrencyCode = &amountParts[1]
+	}
+	payerDataJson, ok := rawReq["payerData"].(map[string]interface{})
+	if !ok {
+		return errors.New("missing or invalid payerData field")
+	}
+	payerDataJsonBytes, err := json.Marshal(payerDataJson)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(payerDataJsonBytes, &p.PayerData)
+	if err != nil {
+		return err
+	}
+	payeeDataJson, ok := rawReq["payeeData"].(map[string]interface{})
+	if ok {
+		payeeDataJsonBytes, err := json.Marshal(payeeDataJson)
+		if err != nil {
+			return err
+		}
+		var payeeData CounterPartyDataOptions
+		err = json.Unmarshal(payeeDataJsonBytes, &payeeData)
+		if err != nil {
+			return err
+		}
+		p.RequestedPayeeData = &payeeData
+	}
+	return nil
 }
 
 func (q *PayRequest) Encode() ([]byte, error) {
@@ -162,11 +262,15 @@ type Route struct {
 }
 
 type PayReqResponsePaymentInfo struct {
+	// Amount is the amount that the receiver will receive in the receiving currency not including fees. The amount is
+	//    specified in the smallest unit of the currency (eg. cents for USD).
+	Amount int64 `json:"amount"`
 	// CurrencyCode is the currency code that the receiver will receive for this payment.
 	CurrencyCode string `json:"currencyCode"`
-	// Multiplier is the conversion rate. It is the number of millisatoshis that the receiver will receive for 1 unit of the specified currency.
-	// In this context, this is just for convenience. The conversion rate is also baked into the invoice amount itself.
-	// `invoice amount = amount * multiplier + exchangeFeesMillisatoshi`
+	// Multiplier is the conversion rate. It is the number of millisatoshis that the receiver will receive for 1 unit of
+	//    the specified currency. In this context, this is just for convenience. The conversion rate is also baked into
+	//    the invoice amount itself.
+	//    `invoice amount = Amount * Multiplier + ExchangeFeesMillisatoshi`
 	Multiplier float64 `json:"multiplier"`
 	// Decimals is the number of digits after the decimal point for the receiving currency. For example, in USD, by
 	// convention, there are 2 digits for cents - $5.95. In this case, `Decimals` would be 2. This should align with the
@@ -175,7 +279,7 @@ type PayReqResponsePaymentInfo struct {
 	Decimals int `json:"decimals"`
 	// ExchangeFeesMillisatoshi is the fees charged (in millisats) by the receiving VASP for this transaction. This is
 	// separate from the Multiplier.
-	ExchangeFeesMillisatoshi int64 `json:"exchangeFeesMillisatoshi"`
+	ExchangeFeesMillisatoshi int64 `json:"fee"`
 }
 
 func (c *CompliancePayeeData) signablePayload(payerIdentifier string, payeeIdentifier string) ([]byte, error) {

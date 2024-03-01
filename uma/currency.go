@@ -14,13 +14,8 @@ type Currency struct {
 	// MillisatoshiPerUnit is the estimated millisats per smallest "unit" of this currency (eg. 1 cent in USD).
 	MillisatoshiPerUnit float64 `json:"multiplier"`
 
-	// MinSendable is the minimum amount of the currency that can be sent in a single transaction. This is in the
-	// smallest unit of the currency (eg. cents for USD).
-	MinSendable int64 `json:"minSendable"`
-
-	// MaxSendable is the maximum amount of the currency that can be sent in a single transaction. This is in the
-	// smallest unit of the currency (eg. cents for USD).
-	MaxSendable int64 `json:"maxSendable"`
+	// Convertible is a struct which contains the range of amounts that can be sent in a single transaction.
+	Convertible ConvertibleCurrency `json:"convertible"`
 
 	// Decimals is the number of digits after the decimal point for display on the sender side, and to add clarity
 	// around what the "smallest unit" of the currency is. For example, in USD, by convention, there are 2 digits for
@@ -30,4 +25,14 @@ type Currency struct {
 	// `decimals` would be 8.
 	// For details on edge cases and examples, see https://github.com/uma-universal-money-address/protocol/blob/main/umad-04-lnurlp-response.md.
 	Decimals int `json:"decimals"`
+}
+
+type ConvertibleCurrency struct {
+	// MinSendable is the minimum amount of the currency that can be sent in a single transaction. This is in the
+	// smallest unit of the currency (eg. cents for USD).
+	MinSendable int64 `json:"min"`
+
+	// MaxSendable is the maximum amount of the currency that can be sent in a single transaction. This is in the
+	// smallest unit of the currency (eg. cents for USD).
+	MaxSendable int64 `json:"max"`
 }
