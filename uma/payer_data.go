@@ -108,3 +108,16 @@ type CompliancePayerData struct {
 	// UtxoCallback is the URL that the receiver will call to send UTXOs of the channel that the receiver used to receive the payment once it completes.
 	UtxoCallback string `json:"utxoCallback"`
 }
+
+func (c *CompliancePayerData) AsMap() (map[string]interface{}, error) {
+	complianceJson, err := json.Marshal(c)
+	if err != nil {
+		return nil, err
+	}
+	var complianceMap map[string]interface{}
+	err = json.Unmarshal(complianceJson, &complianceMap)
+	if err != nil {
+		return nil, err
+	}
+	return complianceMap, nil
+}

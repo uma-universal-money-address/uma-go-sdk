@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-const MAJOR_VERSION = 0
-const MINOR_VERSION = 3
+const MAJOR_VERSION = 1
+const MINOR_VERSION = 0
 
 var UmaProtocolVersion = fmt.Sprintf("%d.%d", MAJOR_VERSION, MINOR_VERSION)
 
