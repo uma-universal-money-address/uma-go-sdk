@@ -276,7 +276,7 @@ func ParseLnurlpRequest(url url.URL) (*LnurlpRequest, error) {
 //	query: the signed query to verify.
 //	otherVaspSigningPubKey: the public key of the VASP making this request in bytes.
 //	nonceCache: the NonceCache cache to use to prevent replay attacks.
-func VerifyUmaLnurlpQuerySignature(query *UmaLnurlpRequest, otherVaspSigningPubKey []byte, nonceCache NonceCache) error {
+func VerifyUmaLnurlpQuerySignature(query UmaLnurlpRequest, otherVaspSigningPubKey []byte, nonceCache NonceCache) error {
 	err := nonceCache.CheckAndSaveNonce(query.Nonce, query.Timestamp)
 	if err != nil {
 		return err
@@ -391,7 +391,7 @@ func getSignedLnurlpComplianceResponse(
 //	response: the signed response to verify.
 //	otherVaspSigningPubKey: the public key of the VASP making this request in bytes.
 //	nonceCache: the NonceCache cache to use to prevent replay attacks.
-func VerifyUmaLnurlpResponseSignature(response *UmaLnurlpResponse, otherVaspSigningPubKey []byte, nonceCache NonceCache) error {
+func VerifyUmaLnurlpResponseSignature(response UmaLnurlpResponse, otherVaspSigningPubKey []byte, nonceCache NonceCache) error {
 	err := nonceCache.CheckAndSaveNonce(response.Compliance.Nonce, time.Unix(response.Compliance.Timestamp, 0))
 	if err != nil {
 		return err

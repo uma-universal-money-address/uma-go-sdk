@@ -100,7 +100,7 @@ func TestSignAndVerifyLnurlpRequest(t *testing.T) {
 	query, err := uma.ParseLnurlpRequest(*queryUrl)
 	require.NoError(t, err)
 	assert.Equal(t, *query.UmaVersion, uma.UmaProtocolVersion)
-	err = uma.VerifyUmaLnurlpQuerySignature(query.AsUmaRequest(), privateKey.PubKey().SerializeUncompressed(), getNonceCache())
+	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), privateKey.PubKey().SerializeUncompressed(), getNonceCache())
 	require.NoError(t, err)
 }
 
@@ -111,7 +111,7 @@ func TestSignAndVerifyLnurlpRequestInvalidSignature(t *testing.T) {
 	require.NoError(t, err)
 	query, err := uma.ParseLnurlpRequest(*queryUrl)
 	require.NoError(t, err)
-	err = uma.VerifyUmaLnurlpQuerySignature(query.AsUmaRequest(), []byte("invalid pub key"), getNonceCache())
+	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), []byte("invalid pub key"), getNonceCache())
 	require.Error(t, err)
 }
 
@@ -123,7 +123,7 @@ func TestSignAndVerifyLnurlpRequestOldSignature(t *testing.T) {
 	query, err := uma.ParseLnurlpRequest(*queryUrl)
 	require.NoError(t, err)
 	tomorrow := time.Now().AddDate(0, 0, 1)
-	err = uma.VerifyUmaLnurlpQuerySignature(query.AsUmaRequest(), privateKey.PubKey().SerializeUncompressed(), uma.NewInMemoryNonceCache(tomorrow))
+	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), privateKey.PubKey().SerializeUncompressed(), uma.NewInMemoryNonceCache(tomorrow))
 	require.Error(t, err)
 }
 
@@ -137,7 +137,7 @@ func TestSignAndVerifyLnurlpRequestDuplicateNonce(t *testing.T) {
 	nonceCache := getNonceCache()
 	err = nonceCache.CheckAndSaveNonce(query.AsUmaRequest().Nonce, query.AsUmaRequest().Timestamp)
 	require.NoError(t, err)
-	err = uma.VerifyUmaLnurlpQuerySignature(query.AsUmaRequest(), privateKey.PubKey().SerializeUncompressed(), nonceCache)
+	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), privateKey.PubKey().SerializeUncompressed(), nonceCache)
 	require.Error(t, err)
 }
 
@@ -188,7 +188,7 @@ func TestSignAndVerifyLnurlpResponse(t *testing.T) {
 
 	response, err = uma.ParseLnurlpResponse(responseJson)
 	require.NoError(t, err)
-	err = uma.VerifyUmaLnurlpResponseSignature(response.AsUmaResponse(), receiverSigningPrivateKey.PubKey().SerializeUncompressed(), getNonceCache())
+	err = uma.VerifyUmaLnurlpResponseSignature(*response.AsUmaResponse(), receiverSigningPrivateKey.PubKey().SerializeUncompressed(), getNonceCache())
 	require.NoError(t, err)
 }
 
