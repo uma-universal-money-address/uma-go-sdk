@@ -32,7 +32,7 @@ type CompliancePayeeData struct {
 	// Utxos is a list of UTXOs of channels over which the receiver will likely receive the payment.
 	Utxos []string `json:"utxos"`
 	// UtxoCallback is the URL that the sender VASP will call to send UTXOs of the channel that the sender used to send the payment once it completes.
-	UtxoCallback string `json:"utxoCallback"`
+	UtxoCallback *string `json:"utxoCallback"`
 	// Signature is the base64-encoded signature of sha256(SenderAddress|ReceiverAddress|Nonce|Timestamp).
 	Signature string `json:"signature"`
 	// Nonce is a random string that is used to prevent replay attacks.

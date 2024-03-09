@@ -162,7 +162,7 @@ func verifySignature(payload []byte, signature string, otherVaspPubKey []byte) e
 	return nil
 }
 
-// GetSignedLnurlpRequestUrl Creates a signed uma request URL.
+// GetSignedLnurlpRequestUrl Creates a signed uma request URL. Should only be used for UMA requests.
 //
 // Args:
 //
@@ -186,19 +186,24 @@ func GetSignedLnurlpRequestUrl(
 	if umaVersionOverride != nil {
 		umaVersion = *umaVersionOverride
 	}
+	now := time.Now()
 	unsignedRequest := LnurlpRequest{
 		ReceiverAddress:       receiverAddress,
-		IsSubjectToTravelRule: isSubjectToTravelRule,
-		VaspDomain:            senderVaspDomain,
-		Timestamp:             time.Now(),
-		Nonce:                 *nonce,
-		UmaVersion:            umaVersion,
+		IsSubjectToTravelRule: &isSubjectToTravelRule,
+		VaspDomain:            &senderVaspDomain,
+		Timestamp:             &now,
+		Nonce:                 nonce,
+		UmaVersion:            &umaVersion,
 	}
-	signature, err := signPayload(unsignedRequest.signablePayload(), signingPrivateKey)
+	signablePayload, err := unsignedRequest.signablePayload()
 	if err != nil {
 		return nil, err
 	}
-	unsignedRequest.Signature = *signature
+	signature, err := signPayload(signablePayload, signingPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+	unsignedRequest.Signature = signature
 
 	return unsignedRequest.EncodeToUrl()
 }
@@ -207,7 +212,7 @@ func GetSignedLnurlpRequestUrl(
 // You should try to process the request as a regular LNURLp request to fall back to LNURL-PAY.
 func IsUmaLnurlpQuery(url url.URL) bool {
 	query, err := ParseLnurlpRequest(url)
-	return err == nil && query != nil
+	return err == nil && query != nil && query.IsUmaRequest()
 }
 
 // ParseLnurlpRequest Parse Parses the message into an LnurlpRequest object.
@@ -219,14 +224,18 @@ func ParseLnurlpRequest(url url.URL) (*LnurlpRequest, error) {
 	signature := query.Get("signature")
 	vaspDomain := query.Get("vaspDomain")
 	nonce := query.Get("nonce")
-	isSubjectToTravelRule := query.Get("isSubjectToTravelRule")
+	isSubjectToTravelRule := strings.ToLower(query.Get("isSubjectToTravelRule")) == "true"
 	umaVersion := query.Get("umaVersion")
 	timestamp := query.Get("timestamp")
-	timestampAsString, dateErr := strconv.ParseInt(timestamp, 10, 64)
-	if dateErr != nil {
-		return nil, errors.New("invalid timestamp")
+	var timestampAsTime *time.Time
+	if timestamp != "" {
+		timestampAsString, dateErr := strconv.ParseInt(timestamp, 10, 64)
+		if dateErr != nil {
+			return nil, errors.New("invalid timestamp")
+		}
+		timestampAsTimeVal := time.Unix(timestampAsString, 0)
+		timestampAsTime = &timestampAsTimeVal
 	}
-	timestampAsTime := time.Unix(timestampAsString, 0)
 
 	if vaspDomain == "" || signature == "" || nonce == "" || timestamp == "" || umaVersion == "" {
 		return nil, errors.New("missing uma query parameters. vaspDomain, umaVersion, signature, nonce, and timestamp are required")
@@ -242,14 +251,21 @@ func ParseLnurlpRequest(url url.URL) (*LnurlpRequest, error) {
 		return nil, UnsupportedVersionError{}
 	}
 
+	nilIfEmpty := func(s string) *string {
+		if s == "" {
+			return nil
+		}
+		return &s
+	}
+
 	return &LnurlpRequest{
-		VaspDomain:            vaspDomain,
-		UmaVersion:            umaVersion,
-		Signature:             signature,
 		ReceiverAddress:       receiverAddress,
-		Nonce:                 nonce,
+		VaspDomain:            nilIfEmpty(vaspDomain),
+		UmaVersion:            nilIfEmpty(umaVersion),
+		Signature:             nilIfEmpty(signature),
+		Nonce:                 nilIfEmpty(nonce),
 		Timestamp:             timestampAsTime,
-		IsSubjectToTravelRule: strings.ToLower(isSubjectToTravelRule) == "true",
+		IsSubjectToTravelRule: &isSubjectToTravelRule,
 	}, nil
 }
 
@@ -260,55 +276,90 @@ func ParseLnurlpRequest(url url.URL) (*LnurlpRequest, error) {
 //	query: the signed query to verify.
 //	otherVaspSigningPubKey: the public key of the VASP making this request in bytes.
 //	nonceCache: the NonceCache cache to use to prevent replay attacks.
-func VerifyUmaLnurlpQuerySignature(query *LnurlpRequest, otherVaspSigningPubKey []byte, nonceCache NonceCache) error {
+func VerifyUmaLnurlpQuerySignature(query UmaLnurlpRequest, otherVaspSigningPubKey []byte, nonceCache NonceCache) error {
 	err := nonceCache.CheckAndSaveNonce(query.Nonce, query.Timestamp)
 	if err != nil {
 		return err
 	}
-	return verifySignature(query.signablePayload(), query.Signature, otherVaspSigningPubKey)
+	signablePayload, err := query.signablePayload()
+	if err != nil {
+		return err
+	}
+	return verifySignature(signablePayload, query.Signature, otherVaspSigningPubKey)
 }
 
 func GetLnurlpResponse(
-	request *LnurlpRequest,
-	privateKeyBytes []byte,
-	requiresTravelRuleInfo bool,
+	request LnurlpRequest,
 	callback string,
 	encodedMetadata string,
 	minSendableSats int64,
 	maxSendableSats int64,
-	payerDataOptions CounterPartyDataOptions,
-	currencyOptions []Currency,
-	receiverKycStatus KycStatus,
+	privateKeyBytes *[]byte,
+	requiresTravelRuleInfo *bool,
+	payerDataOptions *CounterPartyDataOptions,
+	currencyOptions *[]Currency,
+	receiverKycStatus *KycStatus,
+	commentCharsAllowed *int,
+	nostrPubkey *string,
 ) (*LnurlpResponse, error) {
-	umaVersion, err := SelectLowerVersion(request.UmaVersion, UmaProtocolVersion)
-	if err != nil {
-		return nil, err
+	isUmaRequest := request.IsUmaRequest()
+	var complianceResponse *LnurlComplianceResponse
+	var umaVersion *string
+
+	if isUmaRequest {
+		requiredUmaFields := map[string]interface{}{
+			"privateKeyBytes":        privateKeyBytes,
+			"requiresTravelRuleInfo": requiresTravelRuleInfo,
+			"payerDataOptions":       payerDataOptions,
+			"receiverKycStatus":      receiverKycStatus,
+			"currencyOptions":        currencyOptions,
+		}
+		for fieldName, fieldValue := range requiredUmaFields {
+			if fieldValue == nil {
+				return nil, errors.New("missing required field for UMA: " + fieldName)
+			}
+		}
+		var err error
+		umaVersion, err = SelectLowerVersion(*request.UmaVersion, UmaProtocolVersion)
+		if err != nil {
+			return nil, err
+		}
+
+		complianceResponse, err = getSignedLnurlpComplianceResponse(request, *privateKeyBytes, *requiresTravelRuleInfo, *receiverKycStatus)
+		if err != nil {
+			return nil, err
+		}
+
+		// UMA always requires compliance and identifier fields:
+		if payerDataOptions == nil {
+			payerDataOptions = &CounterPartyDataOptions{}
+		}
+		(*payerDataOptions)[CounterPartyDataFieldCompliance.String()] = CounterPartyDataOption{Mandatory: true}
+		(*payerDataOptions)[CounterPartyDataFieldIdentifier.String()] = CounterPartyDataOption{Mandatory: true}
 	}
 
-	complianceResponse, err := getSignedLnurlpComplianceResponse(request, privateKeyBytes, requiresTravelRuleInfo, receiverKycStatus)
-	if err != nil {
-		return nil, err
+	var allowsNostr *bool = nil
+	if nostrPubkey != nil {
+		*allowsNostr = true
 	}
-
-	// UMA always requires compliance and identifier fields:
-	payerDataOptions[CounterPartyDataFieldCompliance.String()] = CounterPartyDataOption{Mandatory: true}
-	payerDataOptions[CounterPartyDataFieldIdentifier.String()] = CounterPartyDataOption{Mandatory: true}
-
 	return &LnurlpResponse{
-		Tag:               "payRequest",
-		Callback:          callback,
-		MinSendable:       minSendableSats * 1000,
-		MaxSendable:       maxSendableSats * 1000,
-		EncodedMetadata:   encodedMetadata,
-		Currencies:        currencyOptions,
-		RequiredPayerData: payerDataOptions,
-		Compliance:        *complianceResponse,
-		UmaVersion:        *umaVersion,
+		Tag:                 "payRequest",
+		Callback:            callback,
+		MinSendable:         minSendableSats * 1000,
+		MaxSendable:         maxSendableSats * 1000,
+		EncodedMetadata:     encodedMetadata,
+		Currencies:          currencyOptions,
+		RequiredPayerData:   payerDataOptions,
+		Compliance:          complianceResponse,
+		UmaVersion:          umaVersion,
+		CommentCharsAllowed: commentCharsAllowed,
+		NostrPubkey:         nostrPubkey,
+		AllowsNostr:         allowsNostr,
 	}, nil
 }
 
 func getSignedLnurlpComplianceResponse(
-	query *LnurlpRequest,
+	query LnurlpRequest,
 	privateKeyBytes []byte,
 	isSubjectToTravelRule bool,
 	receiverKycStatus KycStatus,
@@ -340,7 +391,7 @@ func getSignedLnurlpComplianceResponse(
 //	response: the signed response to verify.
 //	otherVaspSigningPubKey: the public key of the VASP making this request in bytes.
 //	nonceCache: the NonceCache cache to use to prevent replay attacks.
-func VerifyUmaLnurlpResponseSignature(response *LnurlpResponse, otherVaspSigningPubKey []byte, nonceCache NonceCache) error {
+func VerifyUmaLnurlpResponseSignature(response UmaLnurlpResponse, otherVaspSigningPubKey []byte, nonceCache NonceCache) error {
 	err := nonceCache.CheckAndSaveNonce(response.Compliance.Nonce, time.Unix(response.Compliance.Timestamp, 0))
 	if err != nil {
 		return err
@@ -366,35 +417,38 @@ func GetVaspDomainFromUmaAddress(umaAddress string) (string, error) {
 	return addressParts[1], nil
 }
 
-// GetPayRequest Creates a signed uma pay request.
+// GetUmaPayRequest Creates a signed UMA pay request. For non-UMA LNURL requests, just construct a PayRequest directly.
 //
 // Args:
 //
+//		amount: the amount of the payment in the smallest unit of the specified currency (i.e. cents for USD).
 //		receiverEncryptionPubKey: the public key of the receiver that will be used to encrypt the travel rule information.
 //		sendingVaspPrivateKey: the private key of the VASP that is sending the payment. This will be used to sign the request.
 //		receivingCurrencyCode: the code of the currency that the receiver will receive for this payment.
 //		isAmountInReceivingCurrency: whether the amount field is specified in the smallest unit of the receiving
 //			currency or in msats (if false).
-//		amount: the amount of the payment in the smallest unit of the specified currency (i.e. cents for USD).
 //		payerIdentifier: the identifier of the sender. For example, $alice@vasp1.com
 //		payerName: the name of the sender (optional).
 //		payerEmail: the email of the sender (optional).
 //		trInfo: the travel rule information. This will be encrypted before sending to the receiver.
 //		trInfoFormat: the standardized format of the travel rule information (e.g. IVMS). Null indicates raw json or a
 //			custom format, or no travel rule information.
-//		isPayerKYCd: whether the sender is a KYC'd customer of the sending VASP.
+//		payerKycStatus: whether the sender is a KYC'd customer of the sending VASP.
 //		payerUtxos: the list of UTXOs of the sender's channels that might be used to fund the payment.
 //	 	payerNodePubKey: If known, the public key of the sender's node. If supported by the receiving VASP's compliance provider,
 //	        this will be used to pre-screen the sender's UTXOs for compliance purposes.
 //		utxoCallback: the URL that the receiver will call to send UTXOs of the channel that the receiver used to receive
 //			the payment once it completes.
 //		requestedPayeeData: the payer data options that the sender is requesting about the receiver.
-func GetPayRequest(
+//		comment: a comment that the sender would like to include with the payment. This can only be included
+//	        if the receiver included the `commentAllowed` field in the lnurlp response. The length of
+//	        the comment must be less than or equal to the value of `commentAllowed`.
+func GetUmaPayRequest(
+	amount int64,
 	receiverEncryptionPubKey []byte,
 	sendingVaspPrivateKey []byte,
 	receivingCurrencyCode string,
 	isAmountInReceivingCurrency bool,
-	amount int64,
 	payerIdentifier string,
 	payerName *string,
 	payerEmail *string,
@@ -405,6 +459,7 @@ func GetPayRequest(
 	payerNodePubKey *string,
 	utxoCallback string,
 	requestedPayeeData *CounterPartyDataOptions,
+	comment *string,
 ) (*PayRequest, error) {
 	complianceData, err := getSignedCompliancePayerData(
 		receiverEncryptionPubKey,
@@ -432,17 +487,23 @@ func GetPayRequest(
 		sendingAmountCurrencyCode = nil
 	}
 
+	complianceDataMap, err := complianceData.AsMap()
+	if err != nil {
+		return nil, err
+	}
+
 	return &PayRequest{
 		SendingAmountCurrencyCode: sendingAmountCurrencyCode,
-		ReceivingCurrencyCode:     receivingCurrencyCode,
+		ReceivingCurrencyCode:     &receivingCurrencyCode,
 		Amount:                    amount,
-		PayerData: PayerData{
+		PayerData: &PayerData{
 			CounterPartyDataFieldName.String():       payerName,
 			CounterPartyDataFieldEmail.String():      payerEmail,
 			CounterPartyDataFieldIdentifier.String(): payerIdentifier,
-			CounterPartyDataFieldCompliance.String(): complianceData,
+			CounterPartyDataFieldCompliance.String(): complianceDataMap,
 		},
 		RequestedPayeeData: requestedPayeeData,
+		Comment:            comment,
 	}, nil
 }
 
@@ -512,8 +573,65 @@ func ParsePayRequest(bytes []byte) (*PayRequest, error) {
 	return &response, nil
 }
 
-type UmaInvoiceCreator interface {
-	CreateUmaInvoice(amountMsats int64, metadata string) (*string, error)
+// ParsePayRequestFromQueryParams Parses a pay request from query parameters.
+// This is useful for parsing a non-UMA pay request from a URL query since raw LNURL uses a GET request for the payreq,
+// whereas UMA uses a POST request.
+func ParsePayRequestFromQueryParams(query url.Values) (*PayRequest, error) {
+	amountStr := query.Get("amount")
+	if amountStr == "" {
+		return nil, errors.New("missing amount")
+	}
+	amountParts := strings.Split(amountStr, ".")
+	if len(amountParts) > 2 {
+		return nil, errors.New("invalid amount")
+	}
+	amount, err := strconv.ParseInt(amountParts[0], 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	var sendingAmountCurrencyCode *string
+	if len(amountParts) == 2 {
+		sendingAmountCurrencyCode = &amountParts[1]
+	}
+	receivingCurrencyCodeStr := query.Get("convert")
+	var receivingCurrencyCode *string
+	if receivingCurrencyCodeStr != "" {
+		receivingCurrencyCode = &receivingCurrencyCodeStr
+	}
+
+	payerData := query.Get("payerData")
+	var payerDataObj *PayerData
+	if payerData != "" {
+		err = json.Unmarshal([]byte(payerData), &payerDataObj)
+		if err != nil {
+			return nil, err
+		}
+	}
+	requestedPayeeData := query.Get("payeeData")
+	var requestedPayeeDataObj *CounterPartyDataOptions
+	if requestedPayeeData != "" {
+		err = json.Unmarshal([]byte(requestedPayeeData), &requestedPayeeDataObj)
+		if err != nil {
+			return nil, err
+		}
+	}
+	commentParam := query.Get("comment")
+	var comment *string
+	if commentParam != "" {
+		comment = &commentParam
+	}
+	return &PayRequest{
+		SendingAmountCurrencyCode: sendingAmountCurrencyCode,
+		ReceivingCurrencyCode:     receivingCurrencyCode,
+		Amount:                    amount,
+		PayerData:                 payerDataObj,
+		RequestedPayeeData:        requestedPayeeDataObj,
+		Comment:                   comment,
+	}, nil
+}
+
+type InvoiceCreator interface {
+	CreateInvoice(amountMsats int64, metadata string) (*string, error)
 }
 
 // GetPayReqResponse Creates an uma pay request response with an encoded invoice.
@@ -541,77 +659,181 @@ type UmaInvoiceCreator interface {
 //			mandatory. The data provided does not need to include compliance data, as it will be added automatically.
 //		receivingVaspPrivateKey: the private key of the VASP that is receiving the payment. This will be used to sign the request.
 //		payeeIdentifier: the identifier of the receiver. For example, $bob@vasp2.com
+//		disposable: This field may be used by a WALLET to decide whether the initial LNURL link will be stored locally
+//			for later reuse or erased. If disposable is null, it should be interpreted as true, so if SERVICE intends
+//			its LNURL links to be stored it must return `disposable: false`. UMA should never return
+//			`disposable: false`. See LUD-11.
+//		successAction: an optional action that the wallet should take once the payment is complete. See LUD-09.
 func GetPayReqResponse(
-	query *PayRequest,
-	invoiceCreator UmaInvoiceCreator,
+	request PayRequest,
+	invoiceCreator InvoiceCreator,
 	metadata string,
-	receivingCurrencyCode string,
-	receivingCurrencyDecimals int,
-	conversionRate float64,
-	receiverFeesMillisats int64,
-	receiverChannelUtxos []string,
+	receivingCurrencyCode *string,
+	receivingCurrencyDecimals *int,
+	conversionRate *float64,
+	receiverFeesMillisats *int64,
+	receiverChannelUtxos *[]string,
 	receiverNodePubKey *string,
-	utxoCallback string,
+	utxoCallback *string,
 	payeeData *PayeeData,
-	receivingVaspPrivateKey []byte,
-	payeeIdentifier string,
+	receivingVaspPrivateKey *[]byte,
+	payeeIdentifier *string,
+	disposable *bool,
+	successAction *map[string]string,
 ) (*PayReqResponse, error) {
-	if query.SendingAmountCurrencyCode != nil && *query.SendingAmountCurrencyCode != receivingCurrencyCode {
-		return nil, errors.New("sending and receiving currency code mismatch")
+	if request.SendingAmountCurrencyCode != nil && *request.SendingAmountCurrencyCode != *receivingCurrencyCode {
+		return nil, errors.New("the sdk only supports sending in either SAT or the receiving currency")
 	}
-	msatsAmount := int64(math.Round(float64(query.Amount)*conversionRate)) + receiverFeesMillisats
-	receivingCurrencyAmount := query.Amount
-	if query.SendingAmountCurrencyCode == nil {
-		msatsAmount = query.Amount
-		receivingCurrencyAmount = int64(math.Round(float64(msatsAmount-receiverFeesMillisats) / conversionRate))
-	}
-	encodedPayerData, err := json.Marshal(query.PayerData)
+	err := validatePayReqCurrencyFields(receivingCurrencyCode, receivingCurrencyDecimals, conversionRate, receiverFeesMillisats)
 	if err != nil {
 		return nil, err
 	}
-	encodedInvoice, err := invoiceCreator.CreateUmaInvoice(msatsAmount, metadata+"{"+string(encodedPayerData)+"}")
-	if err != nil {
-		return nil, err
+	conversionRateOrOne := 1.0
+	if conversionRate != nil {
+		conversionRateOrOne = *conversionRate
 	}
-	payerIdentifier := query.PayerData.Identifier()
-	if payerIdentifier == nil || *payerIdentifier == "" {
-		return nil, errors.New("payer data is missing")
+	feesOrZero := int64(0)
+	if receiverFeesMillisats != nil {
+		feesOrZero = *receiverFeesMillisats
 	}
-	complianceData, err := getSignedCompliancePayeeData(
-		receivingVaspPrivateKey,
-		*payerIdentifier,
-		payeeIdentifier,
-		receiverChannelUtxos,
-		receiverNodePubKey,
-		utxoCallback,
-	)
-	if err != nil {
-		return nil, err
+	msatsAmount := request.Amount
+	if receivingCurrencyCode != nil && request.SendingAmountCurrencyCode != nil {
+		msatsAmount = int64(math.Round(float64(request.Amount)*(conversionRateOrOne))) + feesOrZero
 	}
-	if payeeData == nil {
-		payeeData = &PayeeData{
-			CounterPartyDataFieldIdentifier.String(): payerIdentifier,
-		}
+	receivingCurrencyAmount := request.Amount
+	if request.SendingAmountCurrencyCode == nil {
+		receivingCurrencyAmount = int64(math.Round(float64(msatsAmount-feesOrZero) / conversionRateOrOne))
 	}
-	if existingCompliance := (*payeeData)[CounterPartyDataFieldCompliance.String()]; existingCompliance == nil {
-		complianceDataAsMap, err := complianceData.AsMap()
+
+	payerDataStr := ""
+	if request.PayerData != nil {
+		encodedPayerData, err := json.Marshal(*(request.PayerData))
 		if err != nil {
 			return nil, err
 		}
-		(*payeeData)[CounterPartyDataFieldCompliance.String()] = complianceDataAsMap
+		payerDataStr = string(encodedPayerData)
+	}
+	encodedInvoice, err := invoiceCreator.CreateInvoice(msatsAmount, metadata+payerDataStr)
+	if err != nil {
+		return nil, err
+	}
+	var complianceData *CompliancePayeeData
+	if request.IsUmaRequest() {
+		err = validateUmaPayReqFields(
+			receivingCurrencyCode,
+			receivingCurrencyDecimals,
+			conversionRate,
+			receiverFeesMillisats,
+			receiverChannelUtxos,
+			receiverNodePubKey,
+			payeeIdentifier,
+			receivingVaspPrivateKey,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		payerIdentifier := request.PayerData.Identifier()
+		var utxos []string
+		if receiverChannelUtxos != nil {
+			utxos = *receiverChannelUtxos
+		}
+		complianceData, err = getSignedCompliancePayeeData(
+			*receivingVaspPrivateKey,
+			*payerIdentifier,
+			*payeeIdentifier,
+			utxos,
+			receiverNodePubKey,
+			utxoCallback,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if payeeData == nil {
+			payeeData = &PayeeData{
+				CounterPartyDataFieldIdentifier.String(): *payeeIdentifier,
+			}
+		}
+		if existingCompliance := (*payeeData)[CounterPartyDataFieldCompliance.String()]; existingCompliance == nil {
+			complianceDataAsMap, err := complianceData.AsMap()
+			if err != nil {
+				return nil, err
+			}
+			(*payeeData)[CounterPartyDataFieldCompliance.String()] = complianceDataAsMap
+		}
+	}
+
+	var paymentInfo *PayReqResponsePaymentInfo
+	if receivingCurrencyCode != nil {
+		paymentInfo = &PayReqResponsePaymentInfo{
+			Amount:                   receivingCurrencyAmount,
+			CurrencyCode:             *receivingCurrencyCode,
+			Multiplier:               *conversionRate,
+			Decimals:                 *receivingCurrencyDecimals,
+			ExchangeFeesMillisatoshi: *receiverFeesMillisats,
+		}
 	}
 	return &PayReqResponse{
 		EncodedInvoice: *encodedInvoice,
 		Routes:         []Route{},
-		PaymentInfo: PayReqResponsePaymentInfo{
-			Amount:                   receivingCurrencyAmount,
-			CurrencyCode:             receivingCurrencyCode,
-			Multiplier:               conversionRate,
-			Decimals:                 receivingCurrencyDecimals,
-			ExchangeFeesMillisatoshi: receiverFeesMillisats,
-		},
-		PayeeData: payeeData,
+		PaymentInfo:    paymentInfo,
+		PayeeData:      payeeData,
+		Disposable:     disposable,
+		SuccessAction:  successAction,
 	}, nil
+}
+
+func validatePayReqCurrencyFields(
+	receivingCurrencyCode *string,
+	receivingCurrencyDecimals *int,
+	conversionRate *float64,
+	receiverFeesMillisats *int64,
+) error {
+	numNilFields := 0
+	if receivingCurrencyCode == nil {
+		numNilFields++
+	}
+	if receivingCurrencyDecimals == nil {
+		numNilFields++
+	}
+	if conversionRate == nil {
+		numNilFields++
+	}
+	if receiverFeesMillisats == nil {
+		numNilFields++
+	}
+	if numNilFields != 0 && numNilFields != 4 {
+		return errors.New("invalid currency fields. must be all nil or all non-nil")
+	}
+	return nil
+}
+
+func validateUmaPayReqFields(
+	receivingCurrencyCode *string,
+	receivingCurrencyDecimals *int,
+	conversionRate *float64,
+	receiverFeesMillisats *int64,
+	receiverChannelUtxos *[]string,
+	receiverNodePubKey *string,
+	payeeIdentifier *string,
+	signingPrivateKeyBytes *[]byte,
+) error {
+	if receivingCurrencyCode == nil || receivingCurrencyDecimals == nil || conversionRate == nil || receiverFeesMillisats == nil {
+		return errors.New("missing currency fields required for UMA")
+	}
+
+	if payeeIdentifier == nil {
+		return errors.New("missing required UMA field payeeIdentifier")
+	}
+
+	if signingPrivateKeyBytes == nil {
+		return errors.New("missing required UMA field signingPrivateKeyBytes")
+	}
+
+	if receiverChannelUtxos == nil && receiverNodePubKey == nil {
+		return errors.New("missing required UMA fields. receiverChannelUtxos and/or receiverNodePubKey is required")
+	}
+	return nil
 }
 
 func getSignedCompliancePayeeData(
@@ -620,7 +842,7 @@ func getSignedCompliancePayeeData(
 	payeeIdentifier string,
 	receiverChannelUtxos []string,
 	receiverNodePubKey *string,
-	utxoCallback string,
+	utxoCallback *string,
 ) (*CompliancePayeeData, error) {
 	timestamp := time.Now().Unix()
 	nonce, err := GenerateNonce()
