@@ -24,7 +24,7 @@ func TestParse(t *testing.T) {
 	nonce := "12345"
 	vaspDomain := "vasp1.com"
 	umaVersion := "1.0"
-	expectedQuery := uma.LnurlpRequest{
+	expectedQuery := protocol.LnurlpRequest{
 		ReceiverAddress:       "bob@vasp2.com",
 		Signature:             &signature,
 		IsSubjectToTravelRule: &isSubjectToTravelRule,
@@ -493,7 +493,7 @@ func TestSignAndVerifyPostTransactionCallback(t *testing.T) {
 	signingPrivateKey, err := secp256k1.GeneratePrivateKey()
 	require.NoError(t, err)
 	callback, err := uma.GetPostTransactionCallback(
-		[]uma.UtxoWithAmount{{Utxo: "abcdef12345", Amount: 1000}},
+		[]protocol.UtxoWithAmount{{Utxo: "abcdef12345", Amount: 1000}},
 		"my-vasp.com",
 		signingPrivateKey.Serialize(),
 	)
@@ -585,7 +585,7 @@ func TestParseAndEncodePayReqToQueryParams(t *testing.T) {
 	require.Equal(t, payreq, payreqReparsed)
 }
 
-func createLnurlpRequest(t *testing.T, signingPrivateKey []byte) uma.LnurlpRequest {
+func createLnurlpRequest(t *testing.T, signingPrivateKey []byte) protocol.LnurlpRequest {
 	queryUrl, err := uma.GetSignedLnurlpRequestUrl(signingPrivateKey, "$bob@vasp2.com", "vasp1.com", true, nil)
 	require.NoError(t, err)
 	query, err := uma.ParseLnurlpRequest(*queryUrl)
