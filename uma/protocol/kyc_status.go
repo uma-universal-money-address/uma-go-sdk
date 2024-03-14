@@ -1,4 +1,4 @@
-package uma
+package protocol
 
 import "encoding/json"
 
