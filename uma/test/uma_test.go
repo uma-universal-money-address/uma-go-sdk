@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/uma-universal-money-address/uma-go-sdk/uma"
-	"github.com/uma-universal-money-address/uma-go-sdk/uma/protocol"
+	umaprotocol "github.com/uma-universal-money-address/uma-go-sdk/uma/protocol"
 	"math"
 	"net/url"
 	"strconv"
@@ -24,7 +24,7 @@ func TestParse(t *testing.T) {
 	nonce := "12345"
 	vaspDomain := "vasp1.com"
 	umaVersion := "1.0"
-	expectedQuery := protocol.LnurlpRequest{
+	expectedQuery := umaprotocol.LnurlpRequest{
 		ReceiverAddress:       "bob@vasp2.com",
 		Signature:             &signature,
 		IsSubjectToTravelRule: &isSubjectToTravelRule,
@@ -152,7 +152,7 @@ func TestSignAndVerifyLnurlpResponse(t *testing.T) {
 	metadata, err := createMetadataForBob()
 	require.NoError(t, err)
 	isSubjectToTravelRule := true
-	kycStatus := protocol.KycStatusVerified
+	kycStatus := umaprotocol.KycStatusVerified
 	response, err := uma.GetLnurlpResponse(
 		request,
 		"https://vasp2.com/api/lnurl/payreq/$bob",
@@ -161,18 +161,18 @@ func TestSignAndVerifyLnurlpResponse(t *testing.T) {
 		10_000_000,
 		&serializedPrivateKey,
 		&isSubjectToTravelRule,
-		&protocol.CounterPartyDataOptions{
-			"name":       protocol.CounterPartyDataOption{Mandatory: false},
-			"email":      protocol.CounterPartyDataOption{Mandatory: false},
-			"compliance": protocol.CounterPartyDataOption{Mandatory: true},
+		&umaprotocol.CounterPartyDataOptions{
+			"name":       umaprotocol.CounterPartyDataOption{Mandatory: false},
+			"email":      umaprotocol.CounterPartyDataOption{Mandatory: false},
+			"compliance": umaprotocol.CounterPartyDataOption{Mandatory: true},
 		},
-		&[]protocol.Currency{
+		&[]umaprotocol.Currency{
 			{
 				Code:                "USD",
 				Name:                "US Dollar",
 				Symbol:              "$",
 				MillisatoshiPerUnit: 34_150,
-				Convertible: protocol.ConvertibleCurrency{
+				Convertible: umaprotocol.ConvertibleCurrency{
 					MinSendable: 1,
 					MaxSendable: 10_000_000,
 				},
@@ -201,7 +201,7 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 
 	trInfo := "some TR info for VASP2"
 	ivmsVersion := "101.1"
-	trFormat := protocol.TravelRuleFormat{
+	trFormat := umaprotocol.TravelRuleFormat{
 		Type:    "IVMS",
 		Version: &ivmsVersion,
 	}
@@ -216,7 +216,7 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 		nil,
 		&trInfo,
 		&trFormat,
-		protocol.KycStatusVerified,
+		umaprotocol.KycStatusVerified,
 		nil,
 		nil,
 		"/api/lnurl/utxocallback?txid=1234",
@@ -264,7 +264,7 @@ func TestMsatsPayReqCreationAndParsing(t *testing.T) {
 
 	trInfo := "some TR info for VASP2"
 	ivmsVersion := "101.1"
-	trFormat := protocol.TravelRuleFormat{
+	trFormat := umaprotocol.TravelRuleFormat{
 		Type:    "IVMS",
 		Version: &ivmsVersion,
 	}
@@ -279,7 +279,7 @@ func TestMsatsPayReqCreationAndParsing(t *testing.T) {
 		nil,
 		&trInfo,
 		&trFormat,
-		protocol.KycStatusVerified,
+		umaprotocol.KycStatusVerified,
 		nil,
 		nil,
 		"/api/lnurl/utxocallback?txid=1234",
@@ -319,11 +319,11 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 	require.NoError(t, err)
 
 	trInfo := "some TR info for VASP2"
-	payeeOptions := protocol.CounterPartyDataOptions{
-		"identifier": protocol.CounterPartyDataOption{
+	payeeOptions := umaprotocol.CounterPartyDataOptions{
+		"identifier": umaprotocol.CounterPartyDataOption{
 			Mandatory: true,
 		},
-		"name": protocol.CounterPartyDataOption{
+		"name": umaprotocol.CounterPartyDataOption{
 			Mandatory: false,
 		},
 	}
@@ -338,7 +338,7 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 		nil,
 		&trInfo,
 		nil,
-		protocol.KycStatusVerified,
+		umaprotocol.KycStatusVerified,
 		nil,
 		nil,
 		"/api/lnurl/utxocallback?txid=1234",
@@ -349,7 +349,7 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 	client := &FakeInvoiceCreator{}
 	metadata, err := createMetadataForBob()
 	require.NoError(t, err)
-	payeeData := protocol.PayeeData{
+	payeeData := umaprotocol.PayeeData{
 		"identifier": "$bob@vasp2.com",
 	}
 	receivingCurrencyCode := "USD"
@@ -410,11 +410,11 @@ func TestMsatsPayReqResponseAndParsing(t *testing.T) {
 	require.NoError(t, err)
 
 	trInfo := "some TR info for VASP2"
-	payeeOptions := protocol.CounterPartyDataOptions{
-		"identifier": protocol.CounterPartyDataOption{
+	payeeOptions := umaprotocol.CounterPartyDataOptions{
+		"identifier": umaprotocol.CounterPartyDataOption{
 			Mandatory: true,
 		},
-		"name": protocol.CounterPartyDataOption{
+		"name": umaprotocol.CounterPartyDataOption{
 			Mandatory: false,
 		},
 	}
@@ -429,7 +429,7 @@ func TestMsatsPayReqResponseAndParsing(t *testing.T) {
 		nil,
 		&trInfo,
 		nil,
-		protocol.KycStatusVerified,
+		umaprotocol.KycStatusVerified,
 		nil,
 		nil,
 		"/api/lnurl/utxocallback?txid=1234",
@@ -440,7 +440,7 @@ func TestMsatsPayReqResponseAndParsing(t *testing.T) {
 	client := &FakeInvoiceCreator{}
 	metadata, err := createMetadataForBob()
 	require.NoError(t, err)
-	payeeData := protocol.PayeeData{
+	payeeData := umaprotocol.PayeeData{
 		"identifier": "$bob@vasp2.com",
 	}
 	receivingCurrencyCode := "USD"
@@ -493,7 +493,7 @@ func TestSignAndVerifyPostTransactionCallback(t *testing.T) {
 	signingPrivateKey, err := secp256k1.GeneratePrivateKey()
 	require.NoError(t, err)
 	callback, err := uma.GetPostTransactionCallback(
-		[]protocol.UtxoWithAmount{{Utxo: "abcdef12345", Amount: 1000}},
+		[]umaprotocol.UtxoWithAmount{{Utxo: "abcdef12345", Amount: 1000}},
 		"my-vasp.com",
 		signingPrivateKey.Serialize(),
 	)
@@ -519,16 +519,16 @@ func TestParsePayReqFromQueryParamsNoOptionalFields(t *testing.T) {
 
 func TestParsePayReqFromQueryParamsAllOptionalFields(t *testing.T) {
 	amount := "1000.USD"
-	payerData := protocol.PayerData{
+	payerData := umaprotocol.PayerData{
 		"identifier": "$bob@vasp.com",
 	}
 	encodedPayerData, err := json.Marshal(payerData)
 	require.NoError(t, err)
-	payeeData := protocol.CounterPartyDataOptions{
-		"identifier": protocol.CounterPartyDataOption{
+	payeeData := umaprotocol.CounterPartyDataOptions{
+		"identifier": umaprotocol.CounterPartyDataOption{
 			Mandatory: true,
 		},
-		"name": protocol.CounterPartyDataOption{
+		"name": umaprotocol.CounterPartyDataOption{
 			Mandatory: false,
 		},
 	}
@@ -553,16 +553,16 @@ func TestParsePayReqFromQueryParamsAllOptionalFields(t *testing.T) {
 
 func TestParseAndEncodePayReqToQueryParams(t *testing.T) {
 	amount := "1000.USD"
-	payerData := protocol.PayerData{
+	payerData := umaprotocol.PayerData{
 		"identifier": "$bob@vasp.com",
 	}
 	encodedPayerData, err := json.Marshal(payerData)
 	require.NoError(t, err)
-	payeeData := protocol.CounterPartyDataOptions{
-		"identifier": protocol.CounterPartyDataOption{
+	payeeData := umaprotocol.CounterPartyDataOptions{
+		"identifier": umaprotocol.CounterPartyDataOption{
 			Mandatory: true,
 		},
-		"name": protocol.CounterPartyDataOption{
+		"name": umaprotocol.CounterPartyDataOption{
 			Mandatory: false,
 		},
 	}
@@ -585,7 +585,7 @@ func TestParseAndEncodePayReqToQueryParams(t *testing.T) {
 	require.Equal(t, payreq, payreqReparsed)
 }
 
-func createLnurlpRequest(t *testing.T, signingPrivateKey []byte) protocol.LnurlpRequest {
+func createLnurlpRequest(t *testing.T, signingPrivateKey []byte) umaprotocol.LnurlpRequest {
 	queryUrl, err := uma.GetSignedLnurlpRequestUrl(signingPrivateKey, "$bob@vasp2.com", "vasp1.com", true, nil)
 	require.NoError(t, err)
 	query, err := uma.ParseLnurlpRequest(*queryUrl)
