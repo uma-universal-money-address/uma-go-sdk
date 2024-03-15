@@ -1,6 +1,11 @@
-package uma
+package protocol
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"errors"
+	"strconv"
+	"strings"
+)
 
 // PayeeData is the data that the payer wants to know about the payee. It can be any json data.
 type PayeeData map[string]interface{}
@@ -52,4 +57,17 @@ func (c *CompliancePayeeData) AsMap() (map[string]interface{}, error) {
 		return nil, err
 	}
 	return complianceMap, nil
+}
+
+func (c *CompliancePayeeData) SignablePayload(payerIdentifier string, payeeIdentifier string) ([]byte, error) {
+	if c == nil {
+		return nil, errors.New("compliance data is missing")
+	}
+	payloadString := strings.Join([]string{
+		payerIdentifier,
+		payeeIdentifier,
+		c.SignatureNonce,
+		strconv.FormatInt(c.SignatureTimestamp, 10),
+	}, "|")
+	return []byte(payloadString), nil
 }

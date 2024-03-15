@@ -1,4 +1,4 @@
-package uma
+package protocol
 
 type Currency struct {
 	// Code is the ISO 4217 (if applicable) currency code (eg. "USD"). For cryptocurrencies, this will  be a ticker

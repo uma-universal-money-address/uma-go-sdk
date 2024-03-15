@@ -1,4 +1,4 @@
-package uma
+package protocol
 
 type CounterPartyDataOption struct {
 	Mandatory bool `json:"mandatory"`
