@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 )
@@ -11,13 +12,13 @@ type PostTransactionCallback struct {
 	Utxos []UtxoWithAmount `json:"utxos"`
 	// VaspDomain is the domain of the VASP that is sending the callback.
 	// It will be used by the VASP to fetch the public keys of its counterparty.
-	VaspDomain string `json:"vaspDomain"`
+	VaspDomain *string `json:"vaspDomain"`
 	// Signature is the base64-encoded signature of sha256(Nonce|Timestamp).
-	Signature string `json:"signature"`
+	Signature *string `json:"signature"`
 	// Nonce is a random string that is used to prevent replay attacks.
-	Nonce string `json:"signatureNonce"`
+	Nonce *string `json:"signatureNonce"`
 	// Timestamp is the unix timestamp of when the request was sent. Used in the signature.
-	Timestamp int64 `json:"signatureTimestamp"`
+	Timestamp *int64 `json:"signatureTimestamp"`
 }
 
 // UtxoWithAmount is a pair of utxo and amount transferred over that corresponding channel.
@@ -30,10 +31,14 @@ type UtxoWithAmount struct {
 	Amount int64 `json:"amountMsats"`
 }
 
-func (c *PostTransactionCallback) SignablePayload() []byte {
+func (c *PostTransactionCallback) SignablePayload() (*[]byte, error) {
+	if c.Nonce == nil || c.Timestamp == nil {
+		return nil, errors.New("nonce and timestamp must be set")
+	}
 	payloadString := strings.Join([]string{
-		c.Nonce,
-		strconv.FormatInt(c.Timestamp, 10),
+		*c.Nonce,
+		strconv.FormatInt(*c.Timestamp, 10),
 	}, "|")
-	return []byte(payloadString)
+	payload := []byte(payloadString)
+	return &payload, nil
 }

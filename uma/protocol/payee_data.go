@@ -39,11 +39,14 @@ type CompliancePayeeData struct {
 	// UtxoCallback is the URL that the sender VASP will call to send UTXOs of the channel that the sender used to send the payment once it completes.
 	UtxoCallback *string `json:"utxoCallback"`
 	// Signature is the base64-encoded signature of sha256(SenderAddress|ReceiverAddress|Nonce|Timestamp).
-	Signature string `json:"signature"`
-	// Nonce is a random string that is used to prevent replay attacks.
-	SignatureNonce string `json:"signatureNonce"`
-	// Timestamp is the unix timestamp (in seconds since epoch) of when the request was sent. Used in the signature.
-	SignatureTimestamp int64 `json:"signatureTimestamp"`
+	// Note: This field is optional for UMA v0.X backwards-compatibility. It is required for UMA v1.X.
+	Signature *string `json:"signature"`
+	// SignatureNonce is a random string that is used to prevent replay attacks.
+	// Note: This field is optional for UMA v0.X backwards-compatibility. It is required for UMA v1.X.
+	SignatureNonce *string `json:"signatureNonce"`
+	// SignatureTimestamp is the unix timestamp (in seconds since epoch) of when the request was sent. Used in the signature.
+	// Note: This field is optional for UMA v0.X backwards-compatibility. It is required for UMA v1.X.
+	SignatureTimestamp *int64 `json:"signatureTimestamp"`
 }
 
 func (c *CompliancePayeeData) AsMap() (map[string]interface{}, error) {
@@ -63,11 +66,14 @@ func (c *CompliancePayeeData) SignablePayload(payerIdentifier string, payeeIdent
 	if c == nil {
 		return nil, errors.New("compliance data is missing")
 	}
+	if c.SignatureNonce == nil || c.SignatureTimestamp == nil {
+		return nil, errors.New("compliance data is missing signature nonce or timestamp. Is this a v0.X response")
+	}
 	payloadString := strings.Join([]string{
 		payerIdentifier,
 		payeeIdentifier,
-		c.SignatureNonce,
-		strconv.FormatInt(c.SignatureTimestamp, 10),
+		*c.SignatureNonce,
+		strconv.FormatInt(*c.SignatureTimestamp, 10),
 	}, "|")
 	return []byte(payloadString), nil
 }

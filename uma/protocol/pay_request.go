@@ -46,6 +46,25 @@ type PayRequest struct {
 	// if the receiver included the `commentAllowed` field in the lnurlp response. The length of
 	// the comment must be less than or equal to the value of `commentAllowed`.
 	Comment *string `json:"comment"`
+	// UmaMajorVersion is the major version of the UMA protocol that the VASP supports for this currency. This is used
+	// for serialization, but is not serialized itself.
+	UmaMajorVersion int `json:"-"`
+}
+
+type v0PayRequest struct {
+	ReceivingCurrencyCode *string                  `json:"currency"`
+	Amount                int64                    `json:"amount"`
+	PayerData             *PayerData               `json:"payerData"`
+	RequestedPayeeData    *CounterPartyDataOptions `json:"payeeData"`
+	Comment               *string                  `json:"comment"`
+}
+
+type v1PayRequest struct {
+	ReceivingCurrencyCode *string                  `json:"convert"`
+	Amount                string                   `json:"amount"`
+	PayerData             *PayerData               `json:"payerData"`
+	RequestedPayeeData    *CounterPartyDataOptions `json:"payeeData"`
+	Comment               *string                  `json:"comment"`
 }
 
 // IsUmaRequest returns true if the request is a valid UMA request, otherwise, if any fields are missing, it returns false.
@@ -63,42 +82,27 @@ func (p *PayRequest) IsUmaRequest() bool {
 }
 
 func (p *PayRequest) MarshalJSON() ([]byte, error) {
+	if p.UmaMajorVersion == 0 {
+		return json.Marshal(&v0PayRequest{
+			ReceivingCurrencyCode: p.ReceivingCurrencyCode,
+			Amount:                p.Amount,
+			PayerData:             p.PayerData,
+			RequestedPayeeData:    p.RequestedPayeeData,
+			Comment:               p.Comment,
+		})
+	}
+
 	amount := strconv.FormatInt(p.Amount, 10)
 	if p.SendingAmountCurrencyCode != nil {
 		amount = fmt.Sprintf("%s.%s", amount, *p.SendingAmountCurrencyCode)
 	}
-	var payerDataJson []byte
-	if p.PayerData != nil {
-		var err error
-		payerDataJson, err = json.Marshal(p.PayerData)
-		if err != nil {
-			return nil, err
-		}
-	}
-	reqStr := fmt.Sprintf(`{
-		"amount": "%s"`, amount)
-	if p.ReceivingCurrencyCode != nil {
-		reqStr += fmt.Sprintf(`,
-		"convert": "%s"`, *p.ReceivingCurrencyCode)
-	}
-	if p.PayerData != nil {
-		reqStr += fmt.Sprintf(`,
-		"payerData": %s`, payerDataJson)
-	}
-	if p.RequestedPayeeData != nil {
-		payeeDataJson, err := json.Marshal(p.RequestedPayeeData)
-		if err != nil {
-			return nil, err
-		}
-		reqStr += fmt.Sprintf(`,
-		"payeeData": %s`, payeeDataJson)
-	}
-	if p.Comment != nil {
-		reqStr += fmt.Sprintf(`,
-		"comment": "%s"`, *p.Comment)
-	}
-	reqStr += "}"
-	return []byte(reqStr), nil
+	return json.Marshal(&v1PayRequest{
+		ReceivingCurrencyCode: p.ReceivingCurrencyCode,
+		Amount:                amount,
+		PayerData:             p.PayerData,
+		RequestedPayeeData:    p.RequestedPayeeData,
+		Comment:               p.Comment,
+	})
 }
 
 func (p *PayRequest) UnmarshalJSON(data []byte) error {
@@ -107,18 +111,59 @@ func (p *PayRequest) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	convert, ok := rawReq["convert"].(string)
+	isAmountString := false
+	if _, ok := rawReq["amount"].(string); ok {
+		isAmountString = true
+	} else {
+		_, ok = rawReq["amount"].(float64)
+		if !ok {
+			return errors.New("missing or invalid amount field")
+		}
+	}
+	isUma := false
+	payerData, ok := rawReq["payerData"].(map[string]interface{})
 	if ok {
-		p.ReceivingCurrencyCode = &convert
+		_, ok = payerData["compliance"].(map[string]interface{})
+		if ok {
+			isUma = true
+		}
 	}
-	amount, ok := rawReq["amount"].(string)
-	if !ok {
-		return errors.New("missing or invalid amount field")
+	isV1 := false
+	if _, ok := rawReq["convert"].(string); ok {
+		isV1 = isUma
 	}
+	if isV1 || isAmountString {
+		var v1Req v1PayRequest
+		err = json.Unmarshal(data, &v1Req)
+		if err != nil {
+			return err
+		}
+		return p.UnmarshalFromV1(v1Req)
+	}
+	var v0Req v0PayRequest
+	err = json.Unmarshal(data, &v0Req)
+	if err != nil {
+		return err
+	}
+	err = p.UnmarshalFromV0(v0Req)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *PayRequest) UnmarshalFromV1(request v1PayRequest) error {
+	p.UmaMajorVersion = 1
+	p.ReceivingCurrencyCode = request.ReceivingCurrencyCode
+	p.PayerData = request.PayerData
+	p.RequestedPayeeData = request.RequestedPayeeData
+	p.Comment = request.Comment
+	amount := request.Amount
 	amountParts := strings.Split(amount, ".")
 	if len(amountParts) > 2 {
 		return errors.New("invalid amount field")
 	}
+	var err error
 	p.Amount, err = strconv.ParseInt(amountParts[0], 10, 64)
 	if err != nil {
 		return err
@@ -126,45 +171,25 @@ func (p *PayRequest) UnmarshalJSON(data []byte) error {
 	if len(amountParts) == 2 && len(amountParts[1]) > 0 {
 		p.SendingAmountCurrencyCode = &amountParts[1]
 	}
-	payerDataJson, ok := rawReq["payerData"].(map[string]interface{})
-	if ok {
-		payerDataJsonBytes, err := json.Marshal(payerDataJson)
-		if err != nil {
-			return err
-		}
-		var payerData PayerData
-		err = json.Unmarshal(payerDataJsonBytes, &payerData)
-		if err != nil {
-			return err
-		}
-		p.PayerData = &payerData
-	}
-	payeeDataJson, ok := rawReq["payeeData"].(map[string]interface{})
-	if ok {
-		payeeDataJsonBytes, err := json.Marshal(payeeDataJson)
-		if err != nil {
-			return err
-		}
-		var payeeData CounterPartyDataOptions
-		err = json.Unmarshal(payeeDataJsonBytes, &payeeData)
-		if err != nil {
-			return err
-		}
-		p.RequestedPayeeData = &payeeData
-	}
-	comment, ok := rawReq["comment"].(string)
-	if ok {
-		p.Comment = &comment
-	}
+	return nil
+}
+
+func (p *PayRequest) UnmarshalFromV0(request v0PayRequest) error {
+	p.UmaMajorVersion = 0
+	p.ReceivingCurrencyCode = request.ReceivingCurrencyCode
+	p.PayerData = request.PayerData
+	p.RequestedPayeeData = request.RequestedPayeeData
+	p.Comment = request.Comment
+	p.Amount = request.Amount
 	return nil
 }
 
 func (p *PayRequest) Encode() ([]byte, error) {
-	return json.Marshal(p)
+	return p.MarshalJSON()
 }
 
 func (p *PayRequest) EncodeAsUrlParams() (*url.Values, error) {
-	jsonBytes, err := json.Marshal(p)
+	jsonBytes, err := p.MarshalJSON()
 	if err != nil {
 		return nil, err
 	}
@@ -212,4 +237,68 @@ func (p *PayRequest) SignablePayload() ([]byte, error) {
 		strconv.FormatInt(signatureTimestamp, 10),
 	}, "|")
 	return []byte(payloadString), nil
+}
+
+// ParsePayRequestFromQueryParams Parses a pay request from query parameters.
+// This is useful for parsing a non-UMA pay request from a URL query since raw LNURL uses a GET request for the payreq,
+// whereas UMA uses a POST request.
+func ParsePayRequestFromQueryParams(query url.Values) (*PayRequest, error) {
+	amountStr := query.Get("amount")
+	if amountStr == "" {
+		return nil, errors.New("missing amount")
+	}
+	amountParts := strings.Split(amountStr, ".")
+	if len(amountParts) > 2 {
+		return nil, errors.New("invalid amount")
+	}
+	amount, err := strconv.ParseInt(amountParts[0], 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	var sendingAmountCurrencyCode *string
+	if len(amountParts) == 2 {
+		sendingAmountCurrencyCode = &amountParts[1]
+	}
+	v1ReceivingCurrencyCodeStr := query.Get("convert")
+	v0ReceivingCurrencyCodeStr := query.Get("currency")
+	umaMajorVersion := 1
+	var receivingCurrencyCode *string
+	if v1ReceivingCurrencyCodeStr != "" {
+		receivingCurrencyCode = &v1ReceivingCurrencyCodeStr
+	} else if v0ReceivingCurrencyCodeStr != "" {
+		receivingCurrencyCode = &v0ReceivingCurrencyCodeStr
+		umaMajorVersion = 0
+	}
+
+	payerData := query.Get("payerData")
+	var payerDataObj *PayerData
+	if payerData != "" {
+		err = json.Unmarshal([]byte(payerData), &payerDataObj)
+		if err != nil {
+			return nil, err
+		}
+	}
+	requestedPayeeData := query.Get("payeeData")
+	var requestedPayeeDataObj *CounterPartyDataOptions
+	if requestedPayeeData != "" {
+		err = json.Unmarshal([]byte(requestedPayeeData), &requestedPayeeDataObj)
+		if err != nil {
+			return nil, err
+		}
+	}
+	commentParam := query.Get("comment")
+	var comment *string
+	if commentParam != "" {
+		comment = &commentParam
+	}
+
+	return &PayRequest{
+		SendingAmountCurrencyCode: sendingAmountCurrencyCode,
+		ReceivingCurrencyCode:     receivingCurrencyCode,
+		Amount:                    amount,
+		PayerData:                 payerDataObj,
+		RequestedPayeeData:        requestedPayeeDataObj,
+		Comment:                   comment,
+		UmaMajorVersion:           umaMajorVersion,
+	}, nil
 }
