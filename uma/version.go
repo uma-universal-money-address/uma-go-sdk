@@ -10,6 +10,8 @@ import (
 const MAJOR_VERSION = 1
 const MINOR_VERSION = 0
 
+var backcompatVersions = []string{"0.3"}
+
 var UmaProtocolVersion = fmt.Sprintf("%d.%d", MAJOR_VERSION, MINOR_VERSION)
 
 type UnsupportedVersionError struct {
@@ -42,21 +44,36 @@ func GetSupportedMajorVersionsFromErrorResponseBody(errorResponseBody []byte) ([
 }
 
 func GetSupportedMajorVersions() map[int]struct{} {
-	// NOTE: In the future, we may want to support multiple major versions in the same SDK, but for now, this keeps
-	// things simple.
-	return map[int]struct{}{
-		MAJOR_VERSION: {},
+	versions := make(map[int]struct{})
+	versions[MAJOR_VERSION] = struct{}{}
+	for _, version := range backcompatVersions {
+		parsedVersion, err := ParseVersion(version)
+		if err != nil {
+			continue
+		}
+		versions[parsedVersion.Major] = struct{}{}
 	}
+
+	return versions
 }
 
 func GetHighestSupportedVersionForMajorVersion(majorVersion int) *ParsedVersion {
 	// Note that this also only supports a single major version for now. If we support more than one major version in
 	// the future, we'll need to change this.
-	if majorVersion != MAJOR_VERSION {
-		return nil
+	if majorVersion == MAJOR_VERSION {
+		parsedVersion, _ := ParseVersion(UmaProtocolVersion)
+		return parsedVersion
 	}
-	parsedVersion, _ := ParseVersion(UmaProtocolVersion)
-	return parsedVersion
+	for _, version := range backcompatVersions {
+		parsedVersion, err := ParseVersion(version)
+		if err != nil {
+			continue
+		}
+		if parsedVersion.Major == majorVersion {
+			return parsedVersion
+		}
+	}
+	return nil
 }
 
 func SelectHighestSupportedVersion(otherVaspSupportedMajorVersions []int) *string {
