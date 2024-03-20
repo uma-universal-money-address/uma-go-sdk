@@ -195,6 +195,12 @@ func GetSignedLnurlpRequestUrl(
 // You should try to process the request as a regular LNURLp request to fall back to LNURL-PAY.
 func IsUmaLnurlpQuery(url url.URL) bool {
 	query, err := ParseLnurlpRequest(url)
+	// If err is an UnsupportedVersionError, the request is still an UMA request, but the version is not supported.
+	// The version negotiation should be handled by the VASP when parsing the request.
+	var unsupportedVersionError UnsupportedVersionError
+	if errors.As(err, &unsupportedVersionError) {
+		return true
+	}
 	return err == nil && query != nil
 }
 
@@ -216,6 +222,10 @@ func ParseLnurlpRequest(url url.URL) (*LnurlpRequest, error) {
 	}
 	timestampAsTime := time.Unix(timestampAsString, 0)
 
+	if umaVersion != "" && !IsVersionSupported(umaVersion) {
+		return nil, UnsupportedVersionError{}
+	}
+
 	if vaspDomain == "" || signature == "" || nonce == "" || timestamp == "" || umaVersion == "" {
 		return nil, errors.New("missing uma query parameters. vaspDomain, umaVersion, signature, nonce, and timestamp are required")
 	}
@@ -225,10 +235,6 @@ func ParseLnurlpRequest(url url.URL) (*LnurlpRequest, error) {
 		return nil, errors.New("invalid uma request path")
 	}
 	receiverAddress := pathParts[3] + "@" + url.Host
-
-	if !IsVersionSupported(umaVersion) {
-		return nil, UnsupportedVersionError{}
-	}
 
 	return &LnurlpRequest{
 		VaspDomain:            vaspDomain,
