@@ -32,10 +32,10 @@ func ExtractPubkeyFromPemCertificateChain(certChain string) (*secp256k1.PublicKe
 		return nil, errors.New("empty certificate chain")
 	}
 
-	return parseToSec256K1PublicKey(&v[0].TBSCertificate.PublicKey)
+	return parseToSecp256k1PublicKey(&v[0].TBSCertificate.PublicKey)
 }
 
-func parseToSec256K1PublicKey(keyData *publicKeyInfo) (*secp256k1.PublicKey, error) {
+func parseToSecp256k1PublicKey(keyData *publicKeyInfo) (*secp256k1.PublicKey, error) {
 	asn1Data := keyData.PublicKey.RightAlign()
 	return secp256k1.ParsePubKey(asn1Data)
 }
