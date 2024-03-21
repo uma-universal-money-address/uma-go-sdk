@@ -116,6 +116,19 @@ func TestSignAndVerifyLnurlpRequest(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestParseLnurlpRequestUnsupportedVersion(t *testing.T) {
+	privateKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err)
+	version := "1000.0"
+	queryUrl, err := uma.GetSignedLnurlpRequestUrl(privateKey.Serialize(), "$bob@vasp2.com", "vasp1.com", true, &version)
+	require.NoError(t, err)
+	_, err = uma.ParseLnurlpRequest(*queryUrl)
+	var unsupportedVersionError uma.UnsupportedVersionError
+	require.ErrorAs(t, err, &unsupportedVersionError)
+	require.Equal(t, unsupportedVersionError.UnsupportedVersion, version)
+	require.Equal(t, unsupportedVersionError.SupportedMajorVersions, []int{1, 0})
+}
+
 func TestSignAndVerifyLnurlpRequestInvalidSignature(t *testing.T) {
 	privateKey, err := secp256k1.GeneratePrivateKey()
 	require.NoError(t, err)

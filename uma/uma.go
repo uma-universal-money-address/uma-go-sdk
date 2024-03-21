@@ -246,7 +246,10 @@ func ParseLnurlpRequest(url url.URL) (*protocol.LnurlpRequest, error) {
 	}
 
 	if umaVersion != "" && !IsVersionSupported(umaVersion) {
-		return nil, UnsupportedVersionError{}
+		return nil, UnsupportedVersionError{
+			UnsupportedVersion:     umaVersion,
+			SupportedMajorVersions: GetSupportedMajorVersions(),
+		}
 	}
 
 	if vaspDomain == "" || signature == "" || nonce == "" || timestamp == "" || umaVersion == "" {
