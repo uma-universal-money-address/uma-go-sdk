@@ -41,12 +41,21 @@ func GetSupportedMajorVersionsFromErrorResponseBody(errorResponseBody []byte) ([
 	return vasp2SupportedMajorVersionsIntList, nil
 }
 
-func GetSupportedMajorVersions() map[int]struct{} {
+func getSupportedMajorVersionsMap() map[int]struct{} {
 	// NOTE: In the future, we may want to support multiple major versions in the same SDK, but for now, this keeps
 	// things simple.
-	return map[int]struct{}{
-		MAJOR_VERSION: {},
+	list := GetSupportedMajorVersions()
+	m := make(map[int]struct{})
+	for _, v := range list {
+		m[v] = struct{}{}
 	}
+	return m
+}
+
+func GetSupportedMajorVersions() []int {
+	// NOTE: In the future, we may want to support multiple major versions in the same SDK, but for now, this keeps
+	// things simple.
+	return []int{MAJOR_VERSION}
 }
 
 func GetHighestSupportedVersionForMajorVersion(majorVersion int) *ParsedVersion {
@@ -61,7 +70,7 @@ func GetHighestSupportedVersionForMajorVersion(majorVersion int) *ParsedVersion 
 
 func SelectHighestSupportedVersion(otherVaspSupportedMajorVersions []int) *string {
 	var highestVersion *ParsedVersion
-	supportedMajorVersions := GetSupportedMajorVersions()
+	supportedMajorVersions := getSupportedMajorVersionsMap()
 	for _, otherVaspMajorVersion := range otherVaspSupportedMajorVersions {
 		_, supportsMajorVersion := supportedMajorVersions[otherVaspMajorVersion]
 		if !supportsMajorVersion {
@@ -105,7 +114,7 @@ func IsVersionSupported(version string) bool {
 	if err != nil || parsedVersion == nil {
 		return false
 	}
-	_, supportsMajorVersion := GetSupportedMajorVersions()[parsedVersion.Major]
+	_, supportsMajorVersion := getSupportedMajorVersionsMap()[parsedVersion.Major]
 	return supportsMajorVersion
 }
 

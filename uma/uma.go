@@ -223,7 +223,10 @@ func ParseLnurlpRequest(url url.URL) (*LnurlpRequest, error) {
 	timestampAsTime := time.Unix(timestampAsString, 0)
 
 	if umaVersion != "" && !IsVersionSupported(umaVersion) {
-		return nil, UnsupportedVersionError{}
+		return nil, UnsupportedVersionError{
+			UnsupportedVersion:     umaVersion,
+			SupportedMajorVersions: GetSupportedMajorVersions(),
+		}
 	}
 
 	if vaspDomain == "" || signature == "" || nonce == "" || timestamp == "" || umaVersion == "" {
