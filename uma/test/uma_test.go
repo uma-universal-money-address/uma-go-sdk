@@ -93,6 +93,17 @@ func TestIsUmaQueryInvalidPath(t *testing.T) {
 	require.False(t, uma.IsUmaLnurlpQuery(*urlObj))
 }
 
+func TestIsUmaQueryUnsupportedVersion(t *testing.T) {
+	urlString := "https://vasp2.com/.well-known/lnurlp/bob?signature=signature&nonce=12345&vaspDomain=vasp1.com&umaVersion=10.0&isSubjectToTravelRule=true&timestamp=12345678"
+	urlObj, _ := url.Parse(urlString)
+	assert.True(t, uma.IsUmaLnurlpQuery(*urlObj))
+
+	// Imagine if we removed the travel rule field and nonce field in a future version:
+	urlString = "https://vasp2.com/.well-known/lnurlp/bob?signature=signature&vaspDomain=vasp1.com&umaVersion=10.0&timestamp=12345678"
+	urlObj, _ = url.Parse(urlString)
+	assert.True(t, uma.IsUmaLnurlpQuery(*urlObj))
+}
+
 func TestSignAndVerifyLnurlpRequest(t *testing.T) {
 	privateKey, err := secp256k1.GeneratePrivateKey()
 	require.NoError(t, err)
