@@ -2,9 +2,11 @@ package uma_test
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/require"
-	umaprotocol "github.com/uma-universal-money-address/uma-go-sdk/uma/protocol"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma"
+	umaprotocol "github.com/uma-universal-money-address/uma-go-sdk/uma/protocol"
 )
 
 func TestParseV0Currency(t *testing.T) {
@@ -186,4 +188,66 @@ func TestParseV0PayReqResponse(t *testing.T) {
 	require.Equal(t, []string{"txid"}, compliance.Utxos)
 	require.Equal(t, "https://example.com/utxo", *(compliance.UtxoCallback))
 	require.Equal(t, 0, payReqResp.UmaMajorVersion)
+}
+
+func TestEncodeAndParsePubKeyResponse(t *testing.T) {
+	pubKeyHex := "04419c5467ea563f0010fd614f85e885ac99c21b8e8d416241175fdd5efd2244fe907e2e6fa3dd6631b1b17cd28798da8d882a34c4776d44cc4090781c7aadea1b"
+	pemCertChain := `-----BEGIN CERTIFICATE-----
+MIIB1zCCAXygAwIBAgIUGN3ihBj1RnKoeTM/auDFnNoThR4wCgYIKoZIzj0EAwIw
+QjELMAkGA1UEBhMCVVMxEzARBgNVBAgMCmNhbGlmb3JuaWExDjAMBgNVBAcMBWxv
+cyBhMQ4wDAYDVQQKDAVsaWdodDAeFw0yNDAzMDUyMTAzMTJaFw0yNDAzMTkyMTAz
+MTJaMEIxCzAJBgNVBAYTAlVTMRMwEQYDVQQIDApjYWxpZm9ybmlhMQ4wDAYDVQQH
+DAVsb3MgYTEOMAwGA1UECgwFbGlnaHQwVjAQBgcqhkjOPQIBBgUrgQQACgNCAARB
+nFRn6lY/ABD9YU+F6IWsmcIbjo1BYkEXX91e/SJE/pB+Lm+j3WYxsbF80oeY2o2I
+KjTEd21EzECQeBx6reobo1MwUTAdBgNVHQ4EFgQUU87LnQdiP6XIE6LoKU1PZnbt
+bMwwHwYDVR0jBBgwFoAUU87LnQdiP6XIE6LoKU1PZnbtbMwwDwYDVR0TAQH/BAUw
+AwEB/zAKBggqhkjOPQQDAgNJADBGAiEAvsrvoeo3rbgZdTHxEUIgP0ArLyiO34oz
+NlwL4gk5GpgCIQCvRx4PAyXNV9T6RRE+3wFlqwluOc/pPOjgdRw/wpoNPQ==
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIICdjCCAV6gAwIBAgIUAekCcU1Qhjo2Y6L2Down9BLdfdUwDQYJKoZIhvcNAQEL
+BQAwNDELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAmNhMQwwCgYDVQQHDANsb3MxCjAI
+BgNVBAoMAWEwHhcNMjQwMzA4MDEwNTU3WhcNMjUwMzA4MDEwNTU3WjBAMQswCQYD
+VQQGEwJVUzELMAkGA1UECAwCY2ExDDAKBgNVBAcMA2xvczEKMAgGA1UECgwBYTEK
+MAgGA1UECwwBYTBWMBAGByqGSM49AgEGBSuBBAAKA0IABJ11ZAQKylgIzZmuI5NE
++DyZ9BUDZhxUPSxTxl+s1am+Lxzr9D7wlwOiiqCYHFWpL6lkCmJcCC06P3RyzXIT
+KmyjQjBAMB0GA1UdDgQWBBRXgW6xGB3+mTSSUKlhSiu3LS+TKTAfBgNVHSMEGDAW
+gBTFmyv7+YDpK0WAOHJYAzjynmWsMDANBgkqhkiG9w0BAQsFAAOCAQEAFVAA3wo+
+Hi/k+OWO/1CFqIRV/0cA8F05sBMiKVA11xB6I1y54aUV4R0jN76fOiN1jnZqTRnM
+G8rZUfQgE/LPVbb1ERHQfd8yaeI+TerKdPkMseu/jnvI+dDJfQdsY7iaa7NPO0dm
+t8Nz75cYW8kYuDaq0Hb6uGsywf9LGO/VjrDhyiRxmZ1Oq4JxQmLuh5SDcPfqHTR3
+VbMC1b7eVXaA9O2qYS36zv8cCUSUl5sOSwM6moaFN+xLtVNJ6ZhKPNS2Gd8znhzZ
+AQZcDDpXBO6ORNbhVk5A3X6eQX4Ek1HBTa3pcSUQomYAA9TIuVzL6DSot5GWS8Ek
+usLY8crt6ys3KQ==
+-----END CERTIFICATE-----
+`
+	pubKeyResponse, err := uma.GetPubKeyResponse(pemCertChain, pemCertChain, nil)
+	require.NoError(t, err)
+
+	pubKeyResponseJson, err := pubKeyResponse.MarshalJSON()
+	require.NoError(t, err)
+	pubKeyResponseJsonMap := make(map[string]interface{})
+	err = json.Unmarshal(pubKeyResponseJson, &pubKeyResponseJsonMap)
+	require.NoError(t, err)
+
+	reserializedPubKeyResponse := umaprotocol.PubKeyResponse{}
+	err = json.Unmarshal(pubKeyResponseJson, &reserializedPubKeyResponse)
+	require.NoError(t, err)
+	require.Equal(t, *pubKeyResponse, reserializedPubKeyResponse)
+
+	keysOnlyPubKeyResponse := umaprotocol.PubKeyResponse{
+		SigningPubKeyHex:    &pubKeyHex,
+		EncryptionPubKeyHex: &pubKeyHex,
+	}
+
+	pubKeyResponseJson, err = keysOnlyPubKeyResponse.MarshalJSON()
+	require.NoError(t, err)
+	pubKeyResponseJsonMap = make(map[string]interface{})
+	err = json.Unmarshal(pubKeyResponseJson, &pubKeyResponseJsonMap)
+	require.NoError(t, err)
+
+	reserializedPubKeyResponse = umaprotocol.PubKeyResponse{}
+	err = json.Unmarshal(pubKeyResponseJson, &reserializedPubKeyResponse)
+	require.NoError(t, err)
+	require.Equal(t, keysOnlyPubKeyResponse, reserializedPubKeyResponse)
 }

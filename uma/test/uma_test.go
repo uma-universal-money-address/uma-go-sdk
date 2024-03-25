@@ -674,9 +674,8 @@ func TestParseAndEncodePayReqToQueryParams(t *testing.T) {
 	require.Equal(t, payreq, payreqReparsed)
 }
 
-func TestParseX509CertificateString(t *testing.T) {
-	pemCert := `
------BEGIN CERTIFICATE-----
+func TestCertificateUtils(t *testing.T) {
+	pemCert := `-----BEGIN CERTIFICATE-----
 MIIB1zCCAXygAwIBAgIUGN3ihBj1RnKoeTM/auDFnNoThR4wCgYIKoZIzj0EAwIw
 QjELMAkGA1UEBhMCVVMxEzARBgNVBAgMCmNhbGlmb3JuaWExDjAMBgNVBAcMBWxv
 cyBhMQ4wDAYDVQQKDAVsaWdodDAeFw0yNDAzMDUyMTAzMTJaFw0yNDAzMTkyMTAz
@@ -705,13 +704,20 @@ AQZcDDpXBO6ORNbhVk5A3X6eQX4Ek1HBTa3pcSUQomYAA9TIuVzL6DSot5GWS8Ek
 usLY8crt6ys3KQ==
 -----END CERTIFICATE-----
 `
-	pubkey, err := utils.ExtractPubkeyFromPemCertificateChain(pemCert)
+	pubkey, err := utils.ExtractPubkeyFromPemCertificateChain(&pemCert)
 	require.NoError(t, err)
 
 	publicKeyBytes := pubkey.SerializeUncompressed()
 	expectedPublicKey, err := hex.DecodeString("04419c5467ea563f0010fd614f85e885ac99c21b8e8d416241175fdd5efd2244fe907e2e6fa3dd6631b1b17cd28798da8d882a34c4776d44cc4090781c7aadea1b")
 	require.NoError(t, err)
 	require.Equal(t, publicKeyBytes, expectedPublicKey)
+
+	hexDerCerts, err := utils.ConvertPemCertificateChainToHexEncodedDer(&pemCert)
+	require.NoError(t, err)
+	require.Len(t, hexDerCerts, 2)
+	newPemCert, err := utils.ConvertHexEncodedDerToPemCertChain(&hexDerCerts)
+	require.NoError(t, err)
+	require.Equal(t, *newPemCert, pemCert)
 }
 
 func createLnurlpRequest(t *testing.T, signingPrivateKey []byte) umaprotocol.LnurlpRequest {

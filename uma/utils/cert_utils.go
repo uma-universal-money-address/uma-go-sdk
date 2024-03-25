@@ -3,6 +3,7 @@ package utils
 import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
+	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -10,29 +11,68 @@ import (
 	"time"
 )
 
-func ExtractPubkeyFromPemCertificateChain(certChain string) (*secp256k1.PublicKey, error) {
-	block, _ := pem.Decode([]byte(certChain))
-	if block == nil {
-		return nil, errors.New("failed to parse certificate chain PEM")
+func ConvertPemCertificateChainToHexEncodedDer(certChain *string) ([]string, error) {
+	if certChain == nil {
+		return []string{}, nil
 	}
-	asn1Data := block.Bytes
+	asn1Certs, err := getAsn1DataFromPemChain(certChain)
+	if err != nil {
+		return nil, err
+	}
+	var v []string
+	for _, block := range *asn1Certs {
+		v = append(v, hex.EncodeToString(block))
+	}
+	return v, nil
+}
 
-	var v []*certificate
-	for len(asn1Data) > 0 {
-		cert := new(certificate)
-		var err error
-		asn1Data, err = asn1.Unmarshal(asn1Data, cert)
+func ConvertHexEncodedDerToPemCertChain(hexDerCerts *[]string) (*string, error) {
+	if hexDerCerts == nil || len(*hexDerCerts) == 0 {
+		return nil, nil
+	}
+	var pemCertChain string
+	for _, hexDerCert := range *hexDerCerts {
+		derCert, err := hex.DecodeString(hexDerCert)
 		if err != nil {
 			return nil, err
 		}
-		v = append(v, cert)
+		block := &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: derCert,
+		}
+		pemCertChain = pemCertChain + string(pem.EncodeToMemory(block))
 	}
+	return &pemCertChain, nil
+}
 
-	if len(v) == 0 {
+func ExtractPubkeyFromPemCertificateChain(certChain *string) (*secp256k1.PublicKey, error) {
+	asn1Certs, err := getAsn1DataFromPemChain(certChain)
+	if err != nil {
+		return nil, err
+	}
+	if len(*asn1Certs) == 0 {
 		return nil, errors.New("empty certificate chain")
 	}
+	cert := new(certificate)
+	_, err = asn1.Unmarshal((*asn1Certs)[0], cert)
+	if err != nil {
+		return nil, err
+	}
+	return parseToSecp256k1PublicKey(&cert.TBSCertificate.PublicKey)
+}
 
-	return parseToSecp256k1PublicKey(&v[0].TBSCertificate.PublicKey)
+func getAsn1DataFromPemChain(certChain *string) (*[][]byte, error) {
+	pemData := []byte(*certChain)
+	var v [][]byte
+	for len(pemData) > 0 {
+		var block *pem.Block
+		block, pemData = pem.Decode(pemData)
+		if block == nil {
+			return nil, errors.New("failed to decode PEM block")
+		}
+		v = append(v, block.Bytes)
+	}
+	return &v, nil
 }
 
 func parseToSecp256k1PublicKey(keyData *publicKeyInfo) (*secp256k1.PublicKey, error) {
