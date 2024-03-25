@@ -74,6 +74,37 @@ func FetchPublicKeyForVasp(vaspDomain string, cache PublicKeyCache) (*protocol.P
 	return &pubKeyResponse, nil
 }
 
+// GetPubKeyResponse Creates a public key response to be shared with the counterparty VASP.
+//
+// Args:
+//
+//	signingCertChainPem: The PEM-encoded certificate chain used to verify signatures from a VASP.
+//	encryptionCertChainPem: The PEM-encoded certificate chain used to encrypt TR info sent to a VASP.
+//	expirationTimestamp: Seconds since epoch at which these pub keys must be refreshed. It can be safely cached until this expiration (or forever if null).
+func GetPubKeyResponse(
+	signingCertChainPem string,
+	encryptionCertChainPem string,
+	expirationTimestamp *int64,
+) (*protocol.PubKeyResponse, error) {
+	signingPubKey, err := utils.ExtractPubkeyFromPemCertificateChain(&signingCertChainPem)
+	if err != nil {
+		return nil, err
+	}
+	encryptionPubKey, err := utils.ExtractPubkeyFromPemCertificateChain(&encryptionCertChainPem)
+	if err != nil {
+		return nil, err
+	}
+	signingPubKeyHex := hex.EncodeToString(signingPubKey.SerializeUncompressed())
+	encryptionPubKeyHex := hex.EncodeToString(encryptionPubKey.SerializeUncompressed())
+	return &protocol.PubKeyResponse{
+		SigningCertChain:    &signingCertChainPem,
+		EncryptionCertChain: &encryptionCertChainPem,
+		SigningPubKeyHex:    &signingPubKeyHex,
+		EncryptionPubKeyHex: &encryptionPubKeyHex,
+		ExpirationTimestamp: expirationTimestamp,
+	}, nil
+}
+
 func GenerateNonce() (*string, error) {
 	randomBigInt, err := rand.Int(rand.Reader, big.NewInt(0xFFFFFFFF))
 	if err != nil {
@@ -105,9 +136,9 @@ func signPayload(payload []byte, privateKeyBytes []byte) (*string, error) {
 // Args:
 //
 //	query: the signed query to verify.
-//	otherVaspPubKey: the bytes of the signing public key of the VASP making this request.
+//	otherVaspPubKeyResponse: the PubKeyResponse of the VASP making this request.
 //	nonceCache: the NonceCache cache to use to prevent replay attacks.
-func VerifyPayReqSignature(query *protocol.PayRequest, otherVaspPubKey []byte, nonceCache NonceCache) error {
+func VerifyPayReqSignature(query *protocol.PayRequest, otherVaspPubKeyResponse protocol.PubKeyResponse, nonceCache NonceCache) error {
 	complianceData, err := query.PayerData.Compliance()
 	if err != nil {
 		return err
@@ -126,7 +157,7 @@ func VerifyPayReqSignature(query *protocol.PayRequest, otherVaspPubKey []byte, n
 	if err != nil {
 		return err
 	}
-	return verifySignature(signablePayload, complianceData.Signature, otherVaspPubKey)
+	return verifySignature(signablePayload, complianceData.Signature, otherVaspPubKeyResponse)
 }
 
 // verifySignature Verifies the signature of the uma request.
@@ -135,8 +166,8 @@ func VerifyPayReqSignature(query *protocol.PayRequest, otherVaspPubKey []byte, n
 //
 //	payload: the payload that was signed.
 //	signature: the hex-encoded signature.
-//	otherVaspPubKey: the bytes of the signing public key of the VASP who signed the payload.
-func verifySignature(payload []byte, signature string, otherVaspPubKey []byte) error {
+//	otherVaspPubKeyResponse: the PubKeyResponse of the VASP who signed the payload.
+func verifySignature(payload []byte, signature string, otherVaspPubKeyResponse protocol.PubKeyResponse) error {
 	decodedSignature, err := hex.DecodeString(signature)
 	if err != nil {
 		return err
@@ -145,7 +176,11 @@ func verifySignature(payload []byte, signature string, otherVaspPubKey []byte) e
 	if err != nil {
 		return err
 	}
-	pubKey, err := secp256k1.ParsePubKey(otherVaspPubKey)
+	pubKey, err := otherVaspPubKeyResponse.SigningPubKey()
+	if err != nil {
+		return err
+	}
+	secp256k1Key, err := secp256k1.ParsePubKey(pubKey)
 	if err != nil {
 		return err
 	}
@@ -155,7 +190,7 @@ func verifySignature(payload []byte, signature string, otherVaspPubKey []byte) e
 		return err
 	}
 	hashedPayload := sha256.Sum(nil)
-	verified := parsedSignature.Verify(hashedPayload, pubKey)
+	verified := parsedSignature.Verify(hashedPayload, secp256k1Key)
 
 	if !verified {
 		return errors.New("invalid uma signature")
@@ -276,9 +311,9 @@ func ParseLnurlpRequest(url url.URL) (*protocol.LnurlpRequest, error) {
 // Args:
 //
 //	query: the signed query to verify.
-//	otherVaspSigningPubKey: the public key of the VASP making this request in bytes.
+//	otherVaspPubKeyResponse: the PubKeyResponse of the VASP making this request in bytes.
 //	nonceCache: the NonceCache cache to use to prevent replay attacks.
-func VerifyUmaLnurlpQuerySignature(query protocol.UmaLnurlpRequest, otherVaspSigningPubKey []byte, nonceCache NonceCache) error {
+func VerifyUmaLnurlpQuerySignature(query protocol.UmaLnurlpRequest, otherVaspPubKeyResponse protocol.PubKeyResponse, nonceCache NonceCache) error {
 	err := nonceCache.CheckAndSaveNonce(query.Nonce, query.Timestamp)
 	if err != nil {
 		return err
@@ -287,7 +322,7 @@ func VerifyUmaLnurlpQuerySignature(query protocol.UmaLnurlpRequest, otherVaspSig
 	if err != nil {
 		return err
 	}
-	return verifySignature(signablePayload, query.Signature, otherVaspSigningPubKey)
+	return verifySignature(signablePayload, query.Signature, otherVaspPubKeyResponse)
 }
 
 func GetLnurlpResponse(
@@ -401,14 +436,14 @@ func getSignedLnurlpComplianceResponse(
 // Args:
 //
 //	response: the signed response to verify.
-//	otherVaspSigningPubKey: the public key of the VASP making this request in bytes.
+//	otherVaspPubKeyResponse: the PubKeyResponse of the VASP making this request in bytes.
 //	nonceCache: the NonceCache cache to use to prevent replay attacks.
-func VerifyUmaLnurlpResponseSignature(response protocol.UmaLnurlpResponse, otherVaspSigningPubKey []byte, nonceCache NonceCache) error {
+func VerifyUmaLnurlpResponseSignature(response protocol.UmaLnurlpResponse, otherVaspPubKeyResponse protocol.PubKeyResponse, nonceCache NonceCache) error {
 	err := nonceCache.CheckAndSaveNonce(response.Compliance.Nonce, time.Unix(response.Compliance.Timestamp, 0))
 	if err != nil {
 		return err
 	}
-	return verifySignature(response.SignablePayload(), response.Compliance.Signature, otherVaspSigningPubKey)
+	return verifySignature(response.SignablePayload(), response.Compliance.Signature, otherVaspPubKeyResponse)
 }
 
 func ParseLnurlpResponse(bytes []byte) (*protocol.LnurlpResponse, error) {
@@ -850,13 +885,13 @@ func ParsePayReqResponse(bytes []byte) (*protocol.PayReqResponse, error) {
 // Args:
 //
 //	response: the signed response to verify.
-//	otherVaspPubKey: the bytes of the signing public key of the VASP making this request.
+//	otherVaspPubKeyResponse: the PubKeyResponse of the VASP making this request.
 //	nonceCache: the NonceCache cache to use to prevent replay attacks.
 //	payerIdentifier: the identifier of the sender. For example, $alice@vasp1.com
 //	payeeIdentifier: the identifier of the receiver. For example, $bob@vasp2.com
 func VerifyPayReqResponseSignature(
 	response *protocol.PayReqResponse,
-	otherVaspPubKey []byte,
+	otherVaspPubKeyResponse protocol.PubKeyResponse,
 	nonceCache NonceCache,
 	payerIdentifier string,
 	payeeIdentifier string,
@@ -882,7 +917,7 @@ func VerifyPayReqResponseSignature(
 	if err != nil {
 		return err
 	}
-	return verifySignature(signablePayload, *complianceData.Signature, otherVaspPubKey)
+	return verifySignature(signablePayload, *complianceData.Signature, otherVaspPubKeyResponse)
 }
 
 // GetPostTransactionCallback Creates a signed post transaction callback.
@@ -935,11 +970,11 @@ func ParsePostTransactionCallback(bytes []byte) (*protocol.PostTransactionCallba
 // Args:
 //
 //	callback: the signed callback to verify.
-//	otherVaspPubKey: the bytes of the signing public key of the VASP making this request.
+//	otherVaspPubKeyResponse: the PubKeyResponse of the VASP making this request.
 //	nonceCache: the NonceCache cache to use to prevent replay attacks.
 func VerifyPostTransactionCallbackSignature(
 	callback *protocol.PostTransactionCallback,
-	otherVaspPubKey []byte,
+	otherVaspPubKeyResponse protocol.PubKeyResponse,
 	nonceCache NonceCache,
 ) error {
 	if callback.Signature == nil || callback.Nonce == nil || callback.Timestamp == nil {
@@ -953,5 +988,5 @@ func VerifyPostTransactionCallbackSignature(
 	if err != nil {
 		return err
 	}
-	return verifySignature(*signablePayload, *callback.Signature, otherVaspPubKey)
+	return verifySignature(*signablePayload, *callback.Signature, otherVaspPubKeyResponse)
 }

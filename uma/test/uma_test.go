@@ -102,18 +102,26 @@ func TestSignAndVerifyLnurlpRequest(t *testing.T) {
 	query, err := uma.ParseLnurlpRequest(*queryUrl)
 	require.NoError(t, err)
 	require.Equal(t, *query.UmaVersion, uma.UmaProtocolVersion)
-	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), privateKey.PubKey().SerializeUncompressed(), getNonceCache())
+	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), getPubKeyResponse(privateKey), getNonceCache())
 	require.NoError(t, err)
 }
 
 func TestSignAndVerifyLnurlpRequestInvalidSignature(t *testing.T) {
+	invalidPubKeyHex := "invalid pub key"
+	invalidPubKeyResponse := umaprotocol.PubKeyResponse{
+		SigningCertChain: nil,
+		EncryptionCertChain: nil,
+		SigningPubKeyHex: &invalidPubKeyHex,
+		EncryptionPubKeyHex: &invalidPubKeyHex,
+		ExpirationTimestamp: nil,
+	}
 	privateKey, err := secp256k1.GeneratePrivateKey()
 	require.NoError(t, err)
 	queryUrl, err := uma.GetSignedLnurlpRequestUrl(privateKey.Serialize(), "$bob@vasp2.com", "vasp1.com", true, nil)
 	require.NoError(t, err)
 	query, err := uma.ParseLnurlpRequest(*queryUrl)
 	require.NoError(t, err)
-	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), []byte("invalid pub key"), getNonceCache())
+	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), invalidPubKeyResponse, getNonceCache())
 	require.Error(t, err)
 }
 
@@ -125,7 +133,7 @@ func TestSignAndVerifyLnurlpRequestOldSignature(t *testing.T) {
 	query, err := uma.ParseLnurlpRequest(*queryUrl)
 	require.NoError(t, err)
 	tomorrow := time.Now().AddDate(0, 0, 1)
-	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), privateKey.PubKey().SerializeUncompressed(), uma.NewInMemoryNonceCache(tomorrow))
+	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), getPubKeyResponse(privateKey), uma.NewInMemoryNonceCache(tomorrow))
 	require.Error(t, err)
 }
 
@@ -139,7 +147,7 @@ func TestSignAndVerifyLnurlpRequestDuplicateNonce(t *testing.T) {
 	nonceCache := getNonceCache()
 	err = nonceCache.CheckAndSaveNonce(query.AsUmaRequest().Nonce, query.AsUmaRequest().Timestamp)
 	require.NoError(t, err)
-	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), privateKey.PubKey().SerializeUncompressed(), nonceCache)
+	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), getPubKeyResponse(privateKey), nonceCache)
 	require.Error(t, err)
 }
 
@@ -190,7 +198,7 @@ func TestSignAndVerifyLnurlpResponse(t *testing.T) {
 
 	response, err = uma.ParseLnurlpResponse(responseJson)
 	require.NoError(t, err)
-	err = uma.VerifyUmaLnurlpResponseSignature(*response.AsUmaResponse(), receiverSigningPrivateKey.PubKey().SerializeUncompressed(), getNonceCache())
+	err = uma.VerifyUmaLnurlpResponseSignature(*response.AsUmaResponse(), getPubKeyResponse(receiverSigningPrivateKey), getNonceCache())
 	require.NoError(t, err)
 }
 
@@ -240,7 +248,7 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 	payreq, err = uma.ParsePayRequest(payreqJson)
 	require.NoError(t, err)
 
-	err = uma.VerifyPayReqSignature(payreq, senderSigningPrivateKey.PubKey().SerializeUncompressed(), getNonceCache())
+	err = uma.VerifyPayReqSignature(payreq, getPubKeyResponse(senderSigningPrivateKey), getNonceCache())
 	require.NoError(t, err)
 
 	complianceData, err := payreq.PayerData.Compliance()
@@ -397,7 +405,7 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 
 	err = uma.VerifyPayReqResponseSignature(
 		parsedResponse,
-		receiverSigningPrivateKey.PubKey().SerializeUncompressed(),
+		getPubKeyResponse(receiverSigningPrivateKey),
 		getNonceCache(),
 		"$alice@vasp1.com",
 		"$bob@vasp2.com",
@@ -486,7 +494,7 @@ func TestMsatsPayReqResponseAndParsing(t *testing.T) {
 
 	err = uma.VerifyPayReqResponseSignature(
 		parsedResponse,
-		receiverSigningPrivateKey.PubKey().SerializeUncompressed(),
+		getPubKeyResponse(receiverSigningPrivateKey),
 		getNonceCache(),
 		"$alice@vasp1.com",
 		"$bob@vasp2.com",
@@ -591,7 +599,7 @@ func TestSignAndVerifyPostTransactionCallback(t *testing.T) {
 	require.NoError(t, err)
 	parsedCallback, err := uma.ParsePostTransactionCallback(callbackJson)
 	require.NoError(t, err)
-	err = uma.VerifyPostTransactionCallbackSignature(parsedCallback, signingPrivateKey.PubKey().SerializeUncompressed(), getNonceCache())
+	err = uma.VerifyPostTransactionCallbackSignature(parsedCallback, getPubKeyResponse(signingPrivateKey), getNonceCache())
 	require.NoError(t, err)
 }
 
@@ -745,4 +753,15 @@ func createMetadataForBob() (string, error) {
 	}
 
 	return string(jsonMetadata), nil
+}
+
+func getPubKeyResponse(privateKey *secp256k1.PrivateKey) umaprotocol.PubKeyResponse {
+	pubKey := hex.EncodeToString(privateKey.PubKey().SerializeUncompressed())
+	return umaprotocol.PubKeyResponse{
+		SigningCertChain: nil,
+		EncryptionCertChain: nil,
+		SigningPubKeyHex: &pubKey,
+		EncryptionPubKeyHex: &pubKey,
+		ExpirationTimestamp: nil,
+	}
 }
