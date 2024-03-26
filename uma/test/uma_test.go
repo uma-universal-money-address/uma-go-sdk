@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/uma-universal-money-address/uma-go-sdk/uma"
 	umaprotocol "github.com/uma-universal-money-address/uma-go-sdk/uma/protocol"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/utils"
 	"math"
 	"net/url"
 	"strconv"
@@ -112,7 +113,7 @@ func TestSignAndVerifyLnurlpRequest(t *testing.T) {
 	query, err := uma.ParseLnurlpRequest(*queryUrl)
 	require.NoError(t, err)
 	require.Equal(t, *query.UmaVersion, uma.UmaProtocolVersion)
-	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), privateKey.PubKey().SerializeUncompressed(), getNonceCache())
+	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), getPubKeyResponse(privateKey), getNonceCache())
 	require.NoError(t, err)
 }
 
@@ -130,13 +131,21 @@ func TestParseLnurlpRequestUnsupportedVersion(t *testing.T) {
 }
 
 func TestSignAndVerifyLnurlpRequestInvalidSignature(t *testing.T) {
+	invalidPubKeyHex := "invalid pub key"
+	invalidPubKeyResponse := umaprotocol.PubKeyResponse{
+		SigningCertChain:    nil,
+		EncryptionCertChain: nil,
+		SigningPubKeyHex:    &invalidPubKeyHex,
+		EncryptionPubKeyHex: &invalidPubKeyHex,
+		ExpirationTimestamp: nil,
+	}
 	privateKey, err := secp256k1.GeneratePrivateKey()
 	require.NoError(t, err)
 	queryUrl, err := uma.GetSignedLnurlpRequestUrl(privateKey.Serialize(), "$bob@vasp2.com", "vasp1.com", true, nil)
 	require.NoError(t, err)
 	query, err := uma.ParseLnurlpRequest(*queryUrl)
 	require.NoError(t, err)
-	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), []byte("invalid pub key"), getNonceCache())
+	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), invalidPubKeyResponse, getNonceCache())
 	require.Error(t, err)
 }
 
@@ -148,7 +157,7 @@ func TestSignAndVerifyLnurlpRequestOldSignature(t *testing.T) {
 	query, err := uma.ParseLnurlpRequest(*queryUrl)
 	require.NoError(t, err)
 	tomorrow := time.Now().AddDate(0, 0, 1)
-	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), privateKey.PubKey().SerializeUncompressed(), uma.NewInMemoryNonceCache(tomorrow))
+	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), getPubKeyResponse(privateKey), uma.NewInMemoryNonceCache(tomorrow))
 	require.Error(t, err)
 }
 
@@ -162,7 +171,7 @@ func TestSignAndVerifyLnurlpRequestDuplicateNonce(t *testing.T) {
 	nonceCache := getNonceCache()
 	err = nonceCache.CheckAndSaveNonce(query.AsUmaRequest().Nonce, query.AsUmaRequest().Timestamp)
 	require.NoError(t, err)
-	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), privateKey.PubKey().SerializeUncompressed(), nonceCache)
+	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), getPubKeyResponse(privateKey), nonceCache)
 	require.Error(t, err)
 }
 
@@ -213,7 +222,7 @@ func TestSignAndVerifyLnurlpResponse(t *testing.T) {
 
 	response, err = uma.ParseLnurlpResponse(responseJson)
 	require.NoError(t, err)
-	err = uma.VerifyUmaLnurlpResponseSignature(*response.AsUmaResponse(), receiverSigningPrivateKey.PubKey().SerializeUncompressed(), getNonceCache())
+	err = uma.VerifyUmaLnurlpResponseSignature(*response.AsUmaResponse(), getPubKeyResponse(receiverSigningPrivateKey), getNonceCache())
 	require.NoError(t, err)
 }
 
@@ -263,7 +272,7 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 	payreq, err = uma.ParsePayRequest(payreqJson)
 	require.NoError(t, err)
 
-	err = uma.VerifyPayReqSignature(payreq, senderSigningPrivateKey.PubKey().SerializeUncompressed(), getNonceCache())
+	err = uma.VerifyPayReqSignature(payreq, getPubKeyResponse(senderSigningPrivateKey), getNonceCache())
 	require.NoError(t, err)
 
 	complianceData, err := payreq.PayerData.Compliance()
@@ -420,7 +429,7 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 
 	err = uma.VerifyPayReqResponseSignature(
 		parsedResponse,
-		receiverSigningPrivateKey.PubKey().SerializeUncompressed(),
+		getPubKeyResponse(receiverSigningPrivateKey),
 		getNonceCache(),
 		"$alice@vasp1.com",
 		"$bob@vasp2.com",
@@ -509,7 +518,7 @@ func TestMsatsPayReqResponseAndParsing(t *testing.T) {
 
 	err = uma.VerifyPayReqResponseSignature(
 		parsedResponse,
-		receiverSigningPrivateKey.PubKey().SerializeUncompressed(),
+		getPubKeyResponse(receiverSigningPrivateKey),
 		getNonceCache(),
 		"$alice@vasp1.com",
 		"$bob@vasp2.com",
@@ -614,7 +623,7 @@ func TestSignAndVerifyPostTransactionCallback(t *testing.T) {
 	require.NoError(t, err)
 	parsedCallback, err := uma.ParsePostTransactionCallback(callbackJson)
 	require.NoError(t, err)
-	err = uma.VerifyPostTransactionCallbackSignature(parsedCallback, signingPrivateKey.PubKey().SerializeUncompressed(), getNonceCache())
+	err = uma.VerifyPostTransactionCallbackSignature(parsedCallback, getPubKeyResponse(signingPrivateKey), getNonceCache())
 	require.NoError(t, err)
 }
 
@@ -697,6 +706,52 @@ func TestParseAndEncodePayReqToQueryParams(t *testing.T) {
 	require.Equal(t, payreq, payreqReparsed)
 }
 
+func TestCertificateUtils(t *testing.T) {
+	pemCert := `-----BEGIN CERTIFICATE-----
+MIIB1zCCAXygAwIBAgIUGN3ihBj1RnKoeTM/auDFnNoThR4wCgYIKoZIzj0EAwIw
+QjELMAkGA1UEBhMCVVMxEzARBgNVBAgMCmNhbGlmb3JuaWExDjAMBgNVBAcMBWxv
+cyBhMQ4wDAYDVQQKDAVsaWdodDAeFw0yNDAzMDUyMTAzMTJaFw0yNDAzMTkyMTAz
+MTJaMEIxCzAJBgNVBAYTAlVTMRMwEQYDVQQIDApjYWxpZm9ybmlhMQ4wDAYDVQQH
+DAVsb3MgYTEOMAwGA1UECgwFbGlnaHQwVjAQBgcqhkjOPQIBBgUrgQQACgNCAARB
+nFRn6lY/ABD9YU+F6IWsmcIbjo1BYkEXX91e/SJE/pB+Lm+j3WYxsbF80oeY2o2I
+KjTEd21EzECQeBx6reobo1MwUTAdBgNVHQ4EFgQUU87LnQdiP6XIE6LoKU1PZnbt
+bMwwHwYDVR0jBBgwFoAUU87LnQdiP6XIE6LoKU1PZnbtbMwwDwYDVR0TAQH/BAUw
+AwEB/zAKBggqhkjOPQQDAgNJADBGAiEAvsrvoeo3rbgZdTHxEUIgP0ArLyiO34oz
+NlwL4gk5GpgCIQCvRx4PAyXNV9T6RRE+3wFlqwluOc/pPOjgdRw/wpoNPQ==
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIICdjCCAV6gAwIBAgIUAekCcU1Qhjo2Y6L2Down9BLdfdUwDQYJKoZIhvcNAQEL
+BQAwNDELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAmNhMQwwCgYDVQQHDANsb3MxCjAI
+BgNVBAoMAWEwHhcNMjQwMzA4MDEwNTU3WhcNMjUwMzA4MDEwNTU3WjBAMQswCQYD
+VQQGEwJVUzELMAkGA1UECAwCY2ExDDAKBgNVBAcMA2xvczEKMAgGA1UECgwBYTEK
+MAgGA1UECwwBYTBWMBAGByqGSM49AgEGBSuBBAAKA0IABJ11ZAQKylgIzZmuI5NE
++DyZ9BUDZhxUPSxTxl+s1am+Lxzr9D7wlwOiiqCYHFWpL6lkCmJcCC06P3RyzXIT
+KmyjQjBAMB0GA1UdDgQWBBRXgW6xGB3+mTSSUKlhSiu3LS+TKTAfBgNVHSMEGDAW
+gBTFmyv7+YDpK0WAOHJYAzjynmWsMDANBgkqhkiG9w0BAQsFAAOCAQEAFVAA3wo+
+Hi/k+OWO/1CFqIRV/0cA8F05sBMiKVA11xB6I1y54aUV4R0jN76fOiN1jnZqTRnM
+G8rZUfQgE/LPVbb1ERHQfd8yaeI+TerKdPkMseu/jnvI+dDJfQdsY7iaa7NPO0dm
+t8Nz75cYW8kYuDaq0Hb6uGsywf9LGO/VjrDhyiRxmZ1Oq4JxQmLuh5SDcPfqHTR3
+VbMC1b7eVXaA9O2qYS36zv8cCUSUl5sOSwM6moaFN+xLtVNJ6ZhKPNS2Gd8znhzZ
+AQZcDDpXBO6ORNbhVk5A3X6eQX4Ek1HBTa3pcSUQomYAA9TIuVzL6DSot5GWS8Ek
+usLY8crt6ys3KQ==
+-----END CERTIFICATE-----
+`
+	pubkey, err := utils.ExtractPubkeyFromPemCertificateChain(&pemCert)
+	require.NoError(t, err)
+
+	publicKeyBytes := pubkey.SerializeUncompressed()
+	expectedPublicKey, err := hex.DecodeString("04419c5467ea563f0010fd614f85e885ac99c21b8e8d416241175fdd5efd2244fe907e2e6fa3dd6631b1b17cd28798da8d882a34c4776d44cc4090781c7aadea1b")
+	require.NoError(t, err)
+	require.Equal(t, publicKeyBytes, expectedPublicKey)
+
+	hexDerCerts, err := utils.ConvertPemCertificateChainToHexEncodedDer(&pemCert)
+	require.NoError(t, err)
+	require.Len(t, hexDerCerts, 2)
+	newPemCert, err := utils.ConvertHexEncodedDerToPemCertChain(&hexDerCerts)
+	require.NoError(t, err)
+	require.Equal(t, *newPemCert, pemCert)
+}
+
 func createLnurlpRequest(t *testing.T, signingPrivateKey []byte) umaprotocol.LnurlpRequest {
 	queryUrl, err := uma.GetSignedLnurlpRequestUrl(signingPrivateKey, "$bob@vasp2.com", "vasp1.com", true, nil)
 	require.NoError(t, err)
@@ -722,4 +777,15 @@ func createMetadataForBob() (string, error) {
 	}
 
 	return string(jsonMetadata), nil
+}
+
+func getPubKeyResponse(privateKey *secp256k1.PrivateKey) umaprotocol.PubKeyResponse {
+	pubKey := hex.EncodeToString(privateKey.PubKey().SerializeUncompressed())
+	return umaprotocol.PubKeyResponse{
+		SigningCertChain:    nil,
+		EncryptionCertChain: nil,
+		SigningPubKeyHex:    &pubKey,
+		EncryptionPubKeyHex: &pubKey,
+		ExpirationTimestamp: nil,
+	}
 }
