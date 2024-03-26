@@ -109,9 +109,9 @@ func TestSignAndVerifyLnurlpRequest(t *testing.T) {
 func TestSignAndVerifyLnurlpRequestInvalidSignature(t *testing.T) {
 	invalidPubKeyHex := "invalid pub key"
 	invalidPubKeyResponse := umaprotocol.PubKeyResponse{
-		SigningCertChain: nil,
+		SigningCertChain:    nil,
 		EncryptionCertChain: nil,
-		SigningPubKeyHex: &invalidPubKeyHex,
+		SigningPubKeyHex:    &invalidPubKeyHex,
 		EncryptionPubKeyHex: &invalidPubKeyHex,
 		ExpirationTimestamp: nil,
 	}
@@ -758,9 +758,9 @@ func createMetadataForBob() (string, error) {
 func getPubKeyResponse(privateKey *secp256k1.PrivateKey) umaprotocol.PubKeyResponse {
 	pubKey := hex.EncodeToString(privateKey.PubKey().SerializeUncompressed())
 	return umaprotocol.PubKeyResponse{
-		SigningCertChain: nil,
+		SigningCertChain:    nil,
 		EncryptionCertChain: nil,
-		SigningPubKeyHex: &pubKey,
+		SigningPubKeyHex:    &pubKey,
 		EncryptionPubKeyHex: &pubKey,
 		ExpirationTimestamp: nil,
 	}
