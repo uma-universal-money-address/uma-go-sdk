@@ -60,34 +60,41 @@ func (r *PubKeyResponse) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	m := map[string]interface{}{
-		"signingCertChain":    signingCertChainHexDer,
-		"encryptionCertChain": encryptionCertChainHexDer,
-		"signingPubKey":       r.SigningPubKeyHex,
-		"encryptionPubKey":    r.EncryptionPubKeyHex,
-		"expirationTimestamp": r.ExpirationTimestamp,
+	m := pubKeyResponseJson{
+		&signingCertChainHexDer,
+		&encryptionCertChainHexDer,
+		r.SigningPubKeyHex,
+		r.EncryptionPubKeyHex,
+		r.ExpirationTimestamp,
 	}
 	return json.Marshal(m)
 }
 
 func (r *PubKeyResponse) UnmarshalJSON(data []byte) error {
-	var temp struct {
-		SigningCertChainHexDer    *[]string `json:"signingCertChain"`
-		EncryptionCertChainHexDer *[]string `json:"encryptionCertChain"`
-		SigningPubKeyHex          string    `json:"signingPubKey"`
-		EncryptionPubKeyHex       string    `json:"encryptionPubKey"`
-		ExpirationTimestamp       *int64    `json:"expirationTimestamp"`
-	}
-
+	var temp pubKeyResponseJson
 	if err := json.Unmarshal(data, &temp); err != nil {
 		return err
 	}
-
-	r.SigningCertChain, _ = utils.ConvertHexEncodedDerToPemCertChain(temp.SigningCertChainHexDer)
-	r.EncryptionCertChain, _ = utils.ConvertHexEncodedDerToPemCertChain(temp.EncryptionCertChainHexDer)
-	r.SigningPubKeyHex = &temp.SigningPubKeyHex
-	r.EncryptionPubKeyHex = &temp.EncryptionPubKeyHex
+	signingCertChainPem, err := utils.ConvertHexEncodedDerToPemCertChain(temp.SigningCertChainHexDer)
+	if err != nil {
+		return err
+	}
+	encryptionCertChainPem, err := utils.ConvertHexEncodedDerToPemCertChain(temp.EncryptionCertChainHexDer)
+	if err != nil {
+		return err
+	}
+	r.SigningCertChain = signingCertChainPem
+	r.EncryptionCertChain = encryptionCertChainPem
+	r.SigningPubKeyHex = temp.SigningPubKeyHex
+	r.EncryptionPubKeyHex = temp.EncryptionPubKeyHex
 	r.ExpirationTimestamp = temp.ExpirationTimestamp
-
 	return nil
+}
+
+type pubKeyResponseJson struct {
+	SigningCertChainHexDer    *[]string `json:"signingCertChain"`
+	EncryptionCertChainHexDer *[]string `json:"encryptionCertChain"`
+	SigningPubKeyHex          *string   `json:"signingPubKey"`
+	EncryptionPubKeyHex       *string   `json:"encryptionPubKey"`
+	ExpirationTimestamp       *int64    `json:"expirationTimestamp"`
 }
