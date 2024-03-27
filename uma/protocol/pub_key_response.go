@@ -31,7 +31,11 @@ func (r *PubKeyResponse) SigningPubKey() ([]byte, error) {
 		}
 		return publicKey.SerializeUncompressed(), nil
 	} else if r.SigningPubKeyHex != nil {
-		return hex.DecodeString(*r.SigningPubKeyHex)
+		publicKey, err := hex.DecodeString(*r.SigningPubKeyHex)
+		if err != nil {
+			return nil, err
+		}
+		return publicKey, nil
 	} else {
 		return nil, errors.New("signingPubKeyHex is nil")
 	}
@@ -44,8 +48,12 @@ func (r *PubKeyResponse) EncryptionPubKey() ([]byte, error) {
 			return nil, err
 		}
 		return publicKey.SerializeUncompressed(), nil
-	} else if r.EncryptionPubKeyHex == nil {
-		return hex.DecodeString(*r.EncryptionPubKeyHex)
+	} else if r.EncryptionPubKeyHex != nil {
+		publicKey, err := hex.DecodeString(*r.EncryptionPubKeyHex)
+		if err != nil {
+			return nil, err
+		}
+		return publicKey, nil
 	} else {
 		return nil, errors.New("encryptionPubKeyHex is nil")
 	}
