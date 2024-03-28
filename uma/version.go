@@ -3,8 +3,6 @@ package uma
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
 )
 
 const MAJOR_VERSION = 1
@@ -24,23 +22,12 @@ func (e UnsupportedVersionError) Error() string {
 }
 
 func GetSupportedMajorVersionsFromErrorResponseBody(errorResponseBody []byte) ([]int, error) {
-	responseJson := make(map[string]string)
+	var responseJson UnsupportedVersionError
 	err := json.Unmarshal(errorResponseBody, &responseJson)
 	if err != nil {
 		return nil, err
 	}
-
-	vasp2SupportedMajorVersions := responseJson["supportedMajorVersions"]
-	vasp2SupportedMajorVersionsList := strings.Split(vasp2SupportedMajorVersions, ",")
-	vasp2SupportedMajorVersionsIntList := make([]int, len(vasp2SupportedMajorVersionsList))
-	for i, version := range vasp2SupportedMajorVersionsList {
-		versionInt, err := strconv.Atoi(version)
-		if err != nil {
-			return nil, err
-		}
-		vasp2SupportedMajorVersionsIntList[i] = versionInt
-	}
-	return vasp2SupportedMajorVersionsIntList, nil
+	return responseJson.SupportedMajorVersions, nil
 }
 
 func getSupportedMajorVersionsMap() map[int]struct{} {
