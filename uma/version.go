@@ -3,12 +3,12 @@ package uma
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
 )
 
-const MAJOR_VERSION = 0
-const MINOR_VERSION = 3
+const MAJOR_VERSION = 1
+const MINOR_VERSION = 0
+
+var backcompatVersions = []string{"0.3"}
 
 var UmaProtocolVersion = fmt.Sprintf("%d.%d", MAJOR_VERSION, MINOR_VERSION)
 
@@ -22,23 +22,12 @@ func (e UnsupportedVersionError) Error() string {
 }
 
 func GetSupportedMajorVersionsFromErrorResponseBody(errorResponseBody []byte) ([]int, error) {
-	responseJson := make(map[string]string)
+	var responseJson UnsupportedVersionError
 	err := json.Unmarshal(errorResponseBody, &responseJson)
 	if err != nil {
 		return nil, err
 	}
-
-	vasp2SupportedMajorVersions := responseJson["supportedMajorVersions"]
-	vasp2SupportedMajorVersionsList := strings.Split(vasp2SupportedMajorVersions, ",")
-	vasp2SupportedMajorVersionsIntList := make([]int, len(vasp2SupportedMajorVersionsList))
-	for i, version := range vasp2SupportedMajorVersionsList {
-		versionInt, err := strconv.Atoi(version)
-		if err != nil {
-			return nil, err
-		}
-		vasp2SupportedMajorVersionsIntList[i] = versionInt
-	}
-	return vasp2SupportedMajorVersionsIntList, nil
+	return responseJson.SupportedMajorVersions, nil
 }
 
 func getSupportedMajorVersionsMap() map[int]struct{} {
@@ -55,17 +44,35 @@ func getSupportedMajorVersionsMap() map[int]struct{} {
 func GetSupportedMajorVersions() []int {
 	// NOTE: In the future, we may want to support multiple major versions in the same SDK, but for now, this keeps
 	// things simple.
-	return []int{MAJOR_VERSION}
+	majorVersions := []int{MAJOR_VERSION}
+	for _, version := range backcompatVersions {
+		parsedVersion, err := ParseVersion(version)
+		if err != nil {
+			continue
+		}
+		majorVersions = append(majorVersions, parsedVersion.Major)
+	}
+
+	return majorVersions
 }
 
 func GetHighestSupportedVersionForMajorVersion(majorVersion int) *ParsedVersion {
 	// Note that this also only supports a single major version for now. If we support more than one major version in
 	// the future, we'll need to change this.
-	if majorVersion != MAJOR_VERSION {
-		return nil
+	if majorVersion == MAJOR_VERSION {
+		parsedVersion, _ := ParseVersion(UmaProtocolVersion)
+		return parsedVersion
 	}
-	parsedVersion, _ := ParseVersion(UmaProtocolVersion)
-	return parsedVersion
+	for _, version := range backcompatVersions {
+		parsedVersion, err := ParseVersion(version)
+		if err != nil {
+			continue
+		}
+		if parsedVersion.Major == majorVersion {
+			return parsedVersion
+		}
+	}
+	return nil
 }
 
 func SelectHighestSupportedVersion(otherVaspSupportedMajorVersions []int) *string {
