@@ -287,10 +287,6 @@ func ParseLnurlpRequest(url url.URL) (*protocol.LnurlpRequest, error) {
 		}
 	}
 
-	if vaspDomain == "" || signature == "" || nonce == "" || timestamp == "" || umaVersion == "" {
-		return nil, errors.New("missing uma query parameters. vaspDomain, umaVersion, signature, nonce, and timestamp are required")
-	}
-
 	pathParts := strings.Split(url.Path, "/")
 	if len(pathParts) != 4 || pathParts[1] != ".well-known" || pathParts[2] != "lnurlp" {
 		return nil, errors.New("invalid uma request path")
