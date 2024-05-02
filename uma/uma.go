@@ -749,6 +749,8 @@ func GetPayReqResponse(
 			payeeData = &protocol.PayeeData{
 				protocol.CounterPartyDataFieldIdentifier.String(): *payeeIdentifier,
 			}
+		} else if (*payeeData)[protocol.CounterPartyDataFieldIdentifier.String()] == nil {
+			(*payeeData)[protocol.CounterPartyDataFieldIdentifier.String()] = *payeeIdentifier
 		}
 		if existingCompliance := (*payeeData)[protocol.CounterPartyDataFieldCompliance.String()]; existingCompliance == nil {
 			complianceDataAsMap, err := complianceData.AsMap()
