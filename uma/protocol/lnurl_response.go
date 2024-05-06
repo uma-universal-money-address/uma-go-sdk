@@ -14,22 +14,22 @@ type LnurlpResponse struct {
 	MaxSendable     int64  `json:"maxSendable"`
 	EncodedMetadata string `json:"metadata"`
 	// Currencies is the list of currencies that the receiver can quote. See LUD-21. Required for UMA.
-	Currencies *[]Currency `json:"currencies"`
+	Currencies *[]Currency `json:"currencies,omitempty"`
 	// RequiredPayerData the data about the payer that the sending VASP must provide in order to send a payment.
-	RequiredPayerData *CounterPartyDataOptions `json:"payerData"`
+	RequiredPayerData *CounterPartyDataOptions `json:"payerData,omitempty"`
 	// Compliance is compliance-related data from the receiving VASP for UMA.
-	Compliance *LnurlComplianceResponse `json:"compliance"`
+	Compliance *LnurlComplianceResponse `json:"compliance,omitempty"`
 	// UmaVersion is the version of the UMA protocol that VASP2 has chosen for this transaction based on its own support
 	// and VASP1's specified preference in the LnurlpRequest. For the version negotiation flow, see
 	// https://static.swimlanes.io/87f5d188e080cb8e0494e46f80f2ae74.png
-	UmaVersion *string `json:"umaVersion"`
+	UmaVersion *string `json:"umaVersion,omitempty"`
 	// CommentCharsAllowed is the number of characters that the sender can include in the comment field of the pay request.
-	CommentCharsAllowed *int `json:"commentAllowed"`
+	CommentCharsAllowed *int `json:"commentAllowed,omitempty"`
 	// NostrPubkey is an optional nostr pubkey used for nostr zaps (NIP-57). If set, it should be a valid BIP-340 public
 	// key in hex format.
-	NostrPubkey *string `json:"nostrPubkey"`
+	NostrPubkey *string `json:"nostrPubkey,omitempty"`
 	// AllowsNostr should be set to true if the receiving VASP allows nostr zaps (NIP-57).
-	AllowsNostr *bool `json:"allowsNostr"`
+	AllowsNostr *bool `json:"allowsNostr,omitempty"`
 }
 
 // LnurlComplianceResponse is the `compliance` field  of the LnurlpResponse.
@@ -83,12 +83,12 @@ type UmaLnurlpResponse struct {
 	// https://static.swimlanes.io/87f5d188e080cb8e0494e46f80f2ae74.png
 	UmaVersion string `json:"umaVersion"`
 	// CommentCharsAllowed is the number of characters that the sender can include in the comment field of the pay request.
-	CommentCharsAllowed *int `json:"commentAllowed"`
+	CommentCharsAllowed *int `json:"commentAllowed,omitempty"`
 	// NostrPubkey is an optional nostr pubkey used for nostr zaps (NIP-57). If set, it should be a valid BIP-340 public
 	// key in hex format.
-	NostrPubkey *string `json:"nostrPubkey"`
+	NostrPubkey *string `json:"nostrPubkey,omitempty"`
 	// AllowsNostr should be set to true if the receiving VASP allows nostr zaps (NIP-57).
-	AllowsNostr *bool `json:"allowsNostr"`
+	AllowsNostr *bool `json:"allowsNostr,omitempty"`
 }
 
 func (r *UmaLnurlpResponse) SignablePayload() []byte {

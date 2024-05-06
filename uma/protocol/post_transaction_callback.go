@@ -12,13 +12,13 @@ type PostTransactionCallback struct {
 	Utxos []UtxoWithAmount `json:"utxos"`
 	// VaspDomain is the domain of the VASP that is sending the callback.
 	// It will be used by the VASP to fetch the public keys of its counterparty.
-	VaspDomain *string `json:"vaspDomain"`
+	VaspDomain *string `json:"vaspDomain,omitempty"`
 	// Signature is the base64-encoded signature of sha256(Nonce|Timestamp).
-	Signature *string `json:"signature"`
+	Signature *string `json:"signature,omitempty"`
 	// Nonce is a random string that is used to prevent replay attacks.
-	Nonce *string `json:"signatureNonce"`
+	Nonce *string `json:"signatureNonce,omitempty"`
 	// Timestamp is the unix timestamp of when the request was sent. Used in the signature.
-	Timestamp *int64 `json:"signatureTimestamp"`
+	Timestamp *int64 `json:"signatureTimestamp,omitempty"`
 }
 
 // UtxoWithAmount is a pair of utxo and amount transferred over that corresponding channel.
