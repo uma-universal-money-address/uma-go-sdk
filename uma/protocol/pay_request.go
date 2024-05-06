@@ -29,42 +29,42 @@ type PayRequest struct {
 	// *should not* pass the sending currency code here, as it is not relevant to the receiver.
 	// Rather, by specifying an invoice amount in msats, the sending VASP can ensure that their
 	// user will be sending a fixed amount, regardless of the exchange rate on the receiving side.
-	SendingAmountCurrencyCode *string `json:"sendingAmountCurrencyCode"`
+	SendingAmountCurrencyCode *string `json:"sendingAmountCurrencyCode,omitempty"`
 	// ReceivingCurrencyCode is the ISO 3-digit currency code that the receiver will receive for this payment. Defaults
 	// to amount being specified in msats if this is not provided.
-	ReceivingCurrencyCode *string `json:"convert"`
+	ReceivingCurrencyCode *string `json:"convert,omitempty"`
 	// Amount is the amount that the receiver will receive for this payment in the smallest unit of the specified
 	// currency (i.e. cents for USD) if `SendingAmountCurrencyCode` is not `nil`. Otherwise, it is the amount in
 	// millisatoshis.
 	Amount int64 `json:"amount"`
 	// PayerData is the data that the sender will send to the receiver to identify themselves. Required for UMA, as is
 	// the `compliance` field in the `payerData` object.
-	PayerData *PayerData `json:"payerData"`
+	PayerData *PayerData `json:"payerData,omitempty"`
 	// RequestedPayeeData is the data that the sender is requesting about the payee.
-	RequestedPayeeData *CounterPartyDataOptions `json:"payeeData"`
+	RequestedPayeeData *CounterPartyDataOptions `json:"payeeData,omitempty"`
 	// Comment is a comment that the sender would like to include with the payment. This can only be included
 	// if the receiver included the `commentAllowed` field in the lnurlp response. The length of
 	// the comment must be less than or equal to the value of `commentAllowed`.
-	Comment *string `json:"comment"`
+	Comment *string `json:"comment,omitempty"`
 	// UmaMajorVersion is the major version of the UMA protocol that the VASP supports for this currency. This is used
 	// for serialization, but is not serialized itself.
 	UmaMajorVersion int `json:"-"`
 }
 
 type v0PayRequest struct {
-	ReceivingCurrencyCode *string                  `json:"currency"`
+	ReceivingCurrencyCode *string                  `json:"currency,omitempty"`
 	Amount                int64                    `json:"amount"`
-	PayerData             *PayerData               `json:"payerData"`
-	RequestedPayeeData    *CounterPartyDataOptions `json:"payeeData"`
-	Comment               *string                  `json:"comment"`
+	PayerData             *PayerData               `json:"payerData,omitempty"`
+	RequestedPayeeData    *CounterPartyDataOptions `json:"payeeData,omitempty"`
+	Comment               *string                  `json:"comment,omitempty"`
 }
 
 type v1PayRequest struct {
-	ReceivingCurrencyCode *string                  `json:"convert"`
+	ReceivingCurrencyCode *string                  `json:"convert,omitempty"`
 	Amount                string                   `json:"amount"`
-	PayerData             *PayerData               `json:"payerData"`
-	RequestedPayeeData    *CounterPartyDataOptions `json:"payeeData"`
-	Comment               *string                  `json:"comment"`
+	PayerData             *PayerData               `json:"payerData,omitempty"`
+	RequestedPayeeData    *CounterPartyDataOptions `json:"payeeData,omitempty"`
+	Comment               *string                  `json:"comment,omitempty"`
 }
 
 // IsUmaRequest returns true if the request is a valid UMA request, otherwise, if any fields are missing, it returns false.

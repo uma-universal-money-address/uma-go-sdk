@@ -92,15 +92,15 @@ func (t *TravelRuleFormat) UnmarshalJSON(data []byte) error {
 
 type CompliancePayerData struct {
 	// Utxos is the list of UTXOs of the sender's channels that might be used to fund the payment.
-	Utxos *[]string `json:"utxos"`
+	Utxos *[]string `json:"utxos,omitempty"`
 	// NodePubKey is the public key of the sender's node if known.
-	NodePubKey *string `json:"nodePubKey"`
+	NodePubKey *string `json:"nodePubKey,omitempty"`
 	// KycStatus indicates whether VASP1 has KYC information about the sender.
 	KycStatus KycStatus `json:"kycStatus"`
 	// EncryptedTravelRuleInfo is the travel rule information of the sender. This is encrypted with the receiver's public encryption key.
-	EncryptedTravelRuleInfo *string `json:"encryptedTravelRuleInfo"`
+	EncryptedTravelRuleInfo *string `json:"encryptedTravelRuleInfo,omitempty"`
 	// TravelRuleFormat is an optional standardized format of the travel rule information (e.g. IVMS). Null indicates raw json or a custom format.
-	TravelRuleFormat *TravelRuleFormat `json:"travelRuleFormat"`
+	TravelRuleFormat *TravelRuleFormat `json:"travelRuleFormat,omitempty"`
 	// Signature is the base64-encoded signature of sha256(ReceiverAddress|Nonce|Timestamp).
 	Signature          string `json:"signature"`
 	SignatureNonce     string `json:"signatureNonce"`

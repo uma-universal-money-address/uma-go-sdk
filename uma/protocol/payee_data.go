@@ -33,20 +33,20 @@ func (p *PayeeData) Compliance() (*CompliancePayeeData, error) {
 
 type CompliancePayeeData struct {
 	// NodePubKey is the public key of the receiver's node if known.
-	NodePubKey *string `json:"nodePubKey"`
+	NodePubKey *string `json:"nodePubKey,omitempty"`
 	// Utxos is a list of UTXOs of channels over which the receiver will likely receive the payment.
 	Utxos []string `json:"utxos"`
 	// UtxoCallback is the URL that the sender VASP will call to send UTXOs of the channel that the sender used to send the payment once it completes.
-	UtxoCallback *string `json:"utxoCallback"`
+	UtxoCallback *string `json:"utxoCallback,omitempty"`
 	// Signature is the base64-encoded signature of sha256(SenderAddress|ReceiverAddress|Nonce|Timestamp).
 	// Note: This field is optional for UMA v0.X backwards-compatibility. It is required for UMA v1.X.
-	Signature *string `json:"signature"`
+	Signature *string `json:"signature,omitempty"`
 	// SignatureNonce is a random string that is used to prevent replay attacks.
 	// Note: This field is optional for UMA v0.X backwards-compatibility. It is required for UMA v1.X.
-	SignatureNonce *string `json:"signatureNonce"`
+	SignatureNonce *string `json:"signatureNonce,omitempty"`
 	// SignatureTimestamp is the unix timestamp (in seconds since epoch) of when the request was sent. Used in the signature.
 	// Note: This field is optional for UMA v0.X backwards-compatibility. It is required for UMA v1.X.
-	SignatureTimestamp *int64 `json:"signatureTimestamp"`
+	SignatureTimestamp *int64 `json:"signatureTimestamp,omitempty"`
 }
 
 func (c *CompliancePayeeData) AsMap() (map[string]interface{}, error) {

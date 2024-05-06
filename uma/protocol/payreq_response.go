@@ -13,17 +13,17 @@ type PayReqResponse struct {
 	Routes []Route `json:"routes"`
 	// PaymentInfo is information about the payment that the receiver will receive. Includes Final currency-related
 	// information for the payment. Required for UMA.
-	PaymentInfo *PayReqResponsePaymentInfo `json:"converted"`
+	PaymentInfo *PayReqResponsePaymentInfo `json:"converted,omitempty"`
 	// PayeeData The data about the receiver that the sending VASP requested in the payreq request.
 	// Required for UMA.
-	PayeeData *PayeeData `json:"payeeData"`
+	PayeeData *PayeeData `json:"payeeData,omitempty"`
 	// Disposable This field may be used by a WALLET to decide whether the initial LNURL link will  be stored locally
 	// for later reuse or erased. If disposable is null, it should be interpreted as true, so if SERVICE intends its
 	// LNURL links to be stored it must return `disposable: false`. UMA should never return `disposable: false` due to
 	// signature nonce checks, etc. See LUD-11.
-	Disposable *bool `json:"disposable"`
+	Disposable *bool `json:"disposable,omitempty"`
 	// SuccessAction defines a struct which can be stored and shown to the user on payment success. See LUD-09.
-	SuccessAction *map[string]string `json:"successAction"`
+	SuccessAction *map[string]string `json:"successAction,omitempty"`
 	// UmaMajorVersion is the major version of the UMA protocol that the receiver is using. Only used
 	// for serialization and deserialization. Not included in the JSON response.
 	UmaMajorVersion int `json:"umaMajorVersion"`
@@ -53,7 +53,7 @@ type Route struct {
 type PayReqResponsePaymentInfo struct {
 	// Amount is the amount that the receiver will receive in the receiving currency not including fees. The amount is
 	//    specified in the smallest unit of the currency (eg. cents for USD).
-	Amount *int64 `json:"amount"`
+	Amount *int64 `json:"amount,omitempty"`
 	// CurrencyCode is the currency code that the receiver will receive for this payment.
 	CurrencyCode string `json:"currencyCode"`
 	// Multiplier is the conversion rate. It is the number of millisatoshis that the receiver will receive for 1 unit of
@@ -81,20 +81,20 @@ type v0PayReqResponsePaymentInfo struct {
 type v0PayReqResponse struct {
 	EncodedInvoice string                       `json:"pr"`
 	Routes         []Route                      `json:"routes"`
-	PaymentInfo    *v0PayReqResponsePaymentInfo `json:"paymentInfo"`
-	PayeeData      *PayeeData                   `json:"payeeData"`
-	Disposable     *bool                        `json:"disposable"`
-	SuccessAction  *map[string]string           `json:"successAction"`
-	Compliance     *CompliancePayeeData         `json:"compliance"`
+	PaymentInfo    *v0PayReqResponsePaymentInfo `json:"paymentInfo,omitempty"`
+	PayeeData      *PayeeData                   `json:"payeeData,omitempty"`
+	Disposable     *bool                        `json:"disposable,omitempty"`
+	SuccessAction  *map[string]string           `json:"successAction,omitempty"`
+	Compliance     *CompliancePayeeData         `json:"compliance,omitempty"`
 }
 
 type v1PayReqResponse struct {
 	EncodedInvoice string                     `json:"pr"`
 	Routes         []Route                    `json:"routes"`
-	PaymentInfo    *PayReqResponsePaymentInfo `json:"converted"`
-	PayeeData      *PayeeData                 `json:"payeeData"`
-	Disposable     *bool                      `json:"disposable"`
-	SuccessAction  *map[string]string         `json:"successAction"`
+	PaymentInfo    *PayReqResponsePaymentInfo `json:"converted,omitempty"`
+	PayeeData      *PayeeData                 `json:"payeeData,omitempty"`
+	Disposable     *bool                      `json:"disposable,omitempty"`
+	SuccessAction  *map[string]string         `json:"successAction,omitempty"`
 }
 
 func (p *PayReqResponse) asV0() (*v0PayReqResponse, error) {

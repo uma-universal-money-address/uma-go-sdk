@@ -100,9 +100,9 @@ func (r *PubKeyResponse) UnmarshalJSON(data []byte) error {
 }
 
 type pubKeyResponseJson struct {
-	SigningCertChainHexDer    *[]string `json:"signingCertChain"`
-	EncryptionCertChainHexDer *[]string `json:"encryptionCertChain"`
-	SigningPubKeyHex          *string   `json:"signingPubKey"`
-	EncryptionPubKeyHex       *string   `json:"encryptionPubKey"`
-	ExpirationTimestamp       *int64    `json:"expirationTimestamp"`
+	SigningCertChainHexDer    *[]string `json:"signingCertChain,omitempty"`
+	EncryptionCertChainHexDer *[]string `json:"encryptionCertChain,omitempty"`
+	SigningPubKeyHex          *string   `json:"signingPubKey,omitempty"`
+	EncryptionPubKeyHex       *string   `json:"encryptionPubKey,omitempty"`
+	ExpirationTimestamp       *int64    `json:"expirationTimestamp,omitempty"`
 }
