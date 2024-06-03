@@ -6,11 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-	eciesgo "github.com/ecies/go/v2"
-	"github.com/uma-universal-money-address/uma-go-sdk/uma/protocol"
-	"github.com/uma-universal-money-address/uma-go-sdk/uma/utils"
 	"io"
 	"math"
 	"math/big"
@@ -19,6 +14,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
+	eciesgo "github.com/ecies/go/v2"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/protocol"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/utils"
 )
 
 // FetchPublicKeyForVasp fetches the public key for another VASP.
@@ -392,7 +393,8 @@ func GetLnurlpResponse(
 
 	var allowsNostr *bool = nil
 	if nostrPubkey != nil {
-		*allowsNostr = true
+		trueValue := true
+		allowsNostr = &trueValue
 	}
 	return &protocol.LnurlpResponse{
 		Tag:                 "protocol.PayRequest",
@@ -985,7 +987,7 @@ func VerifyPostTransactionCallbackSignature(
 	nonceCache NonceCache,
 ) error {
 	if callback.Signature == nil || callback.Nonce == nil || callback.Timestamp == nil {
-		return errors.New("missing signature. Is this a UMA v0 callback? UMA v0 does not require signatures.")
+		return errors.New("missing signature. Is this a UMA v0 callback? UMA v0 does not require signatures")
 	}
 	err := nonceCache.CheckAndSaveNonce(*callback.Nonce, time.Unix(*callback.Timestamp, 0))
 	if err != nil {
