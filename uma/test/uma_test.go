@@ -117,6 +117,20 @@ func TestSignAndVerifyLnurlpRequest(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestSignAndVerifyLnurlpRequestReplacingDomain(t *testing.T) {
+	privateKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err)
+	queryUrl, err := uma.GetSignedLnurlpRequestUrl(privateKey.Serialize(), "$bob@vasp3.com", "vasp1.com", true, nil)
+	require.NoError(t, err)
+	queryUrl.Host = "vasp2.com"
+	query, err := uma.ParseLnurlpRequestWithReceiverDomain(*queryUrl, "vasp3.com")
+	require.NoError(t, err)
+	require.Equal(t, *query.UmaVersion, uma.UmaProtocolVersion)
+	require.Equal(t, query.ReceiverAddress, "$bob@vasp3.com")
+	err = uma.VerifyUmaLnurlpQuerySignature(*query.AsUmaRequest(), getPubKeyResponse(privateKey), getNonceCache())
+	require.NoError(t, err)
+}
+
 func TestParseLnurlpRequestUnsupportedVersion(t *testing.T) {
 	privateKey, err := secp256k1.GeneratePrivateKey()
 	require.NoError(t, err)

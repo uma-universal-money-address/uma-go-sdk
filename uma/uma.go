@@ -264,6 +264,18 @@ func IsUmaLnurlpQuery(url url.URL) bool {
 //
 //	url: the full URL of the uma request.
 func ParseLnurlpRequest(url url.URL) (*protocol.LnurlpRequest, error) {
+	return ParseLnurlpRequestWithReceiverDomain(url, url.Host)
+}
+
+// ParseLnurlpRequestWithReceiverDomain Parses the message into an LnurlpRequest object using an overridden receiver UMA domain.
+//
+// This is useful for cases where the receiver domain is not the same as the incoming request Host, for example when the
+// request is being proxied to another internal service.
+// Args:
+//
+//	url: the full URL of the uma request.
+//	receiverDomain: the domain of the receiver UMA of the payment. This is used to override the domain in the URL.
+func ParseLnurlpRequestWithReceiverDomain(url url.URL, receiverDomain string) (*protocol.LnurlpRequest, error) {
 	query := url.Query()
 	signature := query.Get("signature")
 	vaspDomain := query.Get("vaspDomain")
@@ -292,7 +304,7 @@ func ParseLnurlpRequest(url url.URL) (*protocol.LnurlpRequest, error) {
 	if len(pathParts) != 4 || pathParts[1] != ".well-known" || pathParts[2] != "lnurlp" {
 		return nil, errors.New("invalid uma request path")
 	}
-	receiverAddress := pathParts[3] + "@" + url.Host
+	receiverAddress := pathParts[3] + "@" + receiverDomain
 
 	nilIfEmpty := func(s string) *string {
 		if s == "" {
