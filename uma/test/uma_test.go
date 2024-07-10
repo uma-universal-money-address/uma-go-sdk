@@ -3,6 +3,12 @@ package uma_test
 import (
 	"encoding/hex"
 	"encoding/json"
+	"math"
+	"net/url"
+	"strconv"
+	"testing"
+	"time"
+
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	eciesgo "github.com/ecies/go/v2"
 	"github.com/stretchr/testify/assert"
@@ -10,11 +16,6 @@ import (
 	"github.com/uma-universal-money-address/uma-go-sdk/uma"
 	umaprotocol "github.com/uma-universal-money-address/uma-go-sdk/uma/protocol"
 	"github.com/uma-universal-money-address/uma-go-sdk/uma/utils"
-	"math"
-	"net/url"
-	"strconv"
-	"testing"
-	"time"
 )
 
 func TestParse(t *testing.T) {
