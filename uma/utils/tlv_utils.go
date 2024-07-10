@@ -23,12 +23,12 @@ type TLVCodable interface {
 // The "tlv" tag value will be the type of the field.
 func MarshalTLV(v interface{}) ([]byte, error) {
 	val := reflect.ValueOf(v)
-    if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
+	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
 		return nil, fmt.Errorf("marshal requires a pointer to a struct")
-    }
+	}
 
 	val = reflect.Indirect(val)
-    typ := val.Type()
+	typ := val.Type()
 
 	var result []byte
 	for i := 0; i < val.NumField(); i++ {
@@ -89,27 +89,27 @@ func MarshalTLV(v interface{}) ([]byte, error) {
 func UnmarshalTLV(v interface{}, data []byte) error {
 	result := make(map[byte][]byte)
 	for i := 0; i < len(data); {
-        if i+2 > len(data) {
-            return fmt.Errorf("incomplete TLV at position %d", i)
-        }
-        
-        t := data[i]
-        l := data[i+1]
-        
-        if i+2+int(l) > len(data) {
-            return fmt.Errorf("incomplete value for type %d at position %d", t, i)
-        }
-        
-        v := data[i+2 : i+2+int(l)]
-        result[t] = v
-        
-        i += 2 + int(l)
-    }
+		if i+2 > len(data) {
+			return fmt.Errorf("incomplete TLV at position %d", i)
+		}
+
+		t := data[i]
+		l := data[i+1]
+
+		if i+2+int(l) > len(data) {
+			return fmt.Errorf("incomplete value for type %d at position %d", t, i)
+		}
+
+		v := data[i+2 : i+2+int(l)]
+		result[t] = v
+
+		i += 2 + int(l)
+	}
 
 	val := reflect.ValueOf(v)
 	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("unmarshal requires a pointer to a struct")
-    }
+	}
 	val = reflect.Indirect(val)
 	for i := 0; i < val.NumField(); i++ {
 		field := val.Field(i)

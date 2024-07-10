@@ -21,8 +21,8 @@ func (b *BinaryCodableStruct) UnmarshalBytes(data []byte) error {
 
 type TLVUtilsTests struct {
 	StringField string `tlv:"0"`
-	IntField int `tlv:"1"`
-	BoolField bool `tlv:"2"`
+	IntField    int    `tlv:"1"`
+	BoolField   bool   `tlv:"2"`
 	UInt64Field uint64 `tlv:"3"`
 }
 
@@ -37,8 +37,8 @@ func (d *TLVUtilsTests) UnmarshalTLV(data []byte) error {
 func TestSimpleTLVCoder(t *testing.T) {
 	tlvUtilsTests := TLVUtilsTests{
 		StringField: "hello",
-		IntField: 42,
-		BoolField: true,
+		IntField:    42,
+		BoolField:   true,
 		UInt64Field: 123,
 	}
 
@@ -71,24 +71,24 @@ func TestSimpleTLVCoder(t *testing.T) {
 }
 
 type NestedTLVUtilsTests struct {
-	StringField string `tlv:"0"`
-	IntField int `tlv:"1"`
-	BoolField bool `tlv:"2"`
-	UInt64Field uint64 `tlv:"3"`
-	NestedField TLVUtilsTests `tlv:"4"`
+	StringField        string              `tlv:"0"`
+	IntField           int                 `tlv:"1"`
+	BoolField          bool                `tlv:"2"`
+	UInt64Field        uint64              `tlv:"3"`
+	NestedField        TLVUtilsTests       `tlv:"4"`
 	BinaryCodableField BinaryCodableStruct `tlv:"5"`
 }
 
 func TestNestedTLVCoder(t *testing.T) {
 	nestedTLVUtilsTests := NestedTLVUtilsTests{
 		StringField: "hello",
-		IntField: 42,
-		BoolField: true,
+		IntField:    42,
+		BoolField:   true,
 		UInt64Field: 123,
 		NestedField: TLVUtilsTests{
 			StringField: "world",
-			IntField: 43,
-			BoolField: false,
+			IntField:    43,
+			BoolField:   false,
 			UInt64Field: 124,
 		},
 		BinaryCodableField: BinaryCodableStruct{
