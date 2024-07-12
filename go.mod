@@ -9,6 +9,7 @@ require (
 )
 
 require (
+	github.com/btcsuite/btcutil v1.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/ethereum/go-ethereum v1.13.8 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

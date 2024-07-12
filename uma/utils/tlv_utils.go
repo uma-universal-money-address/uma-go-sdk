@@ -20,7 +20,7 @@ type TLVCodable interface {
 
 // MarshalTLV marshals a struct to TLV.
 // It will marshals all the field with tag "tlv".
-// The "tlv" tag value will be the type of the field.
+// The tagged value will be the type of
 func MarshalTLV(v interface{}) ([]byte, error) {
 	val := reflect.ValueOf(v)
 	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
@@ -29,6 +29,40 @@ func MarshalTLV(v interface{}) ([]byte, error) {
 
 	val = reflect.Indirect(val)
 	typ := val.Type()
+
+	var handle func(field reflect.Value) ([]byte, error)
+	handle = func(field reflect.Value) ([]byte, error) {
+		switch field.Kind() {
+		case reflect.String:
+			return []byte(field.String()), nil
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			return []byte(strconv.FormatInt(field.Int(), 10)), nil
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			return []byte(strconv.FormatUint(field.Uint(), 10)), nil
+		case reflect.Bool:
+			if field.Bool() {
+				return []byte{1}, nil
+			} else {
+				return []byte{0}, nil
+			}
+		case reflect.Ptr:
+			if field.IsNil() {
+				return nil, nil
+			}
+			return handle(reflect.Indirect(field))
+		case reflect.Slice:
+			return field.Bytes(), nil
+		default:
+			pointer := field.Addr().Interface()
+			if coder, ok := pointer.(TLVCodable); ok {
+				return coder.MarshalTLV()
+			} else if coder, ok := pointer.(BytesCodable); ok {
+				return coder.MarshalBytes()
+			} else {
+				return nil, fmt.Errorf("unsupported type %s", field.Kind())
+			}
+		}
+	}
 
 	var result []byte
 	for i := 0; i < val.NumField(); i++ {
@@ -42,40 +76,13 @@ func MarshalTLV(v interface{}) ([]byte, error) {
 			return nil, err
 		}
 
-		var content []byte
-
-		switch field.Kind() {
-		case reflect.String:
-			content = []byte(field.String())
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			content = []byte(strconv.FormatInt(field.Int(), 10))
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			content = []byte(strconv.FormatUint(field.Uint(), 10))
-		case reflect.Struct:
-			pointer := field.Addr().Interface()
-			if coder, ok := pointer.(TLVCodable); ok {
-				content, err = coder.MarshalTLV()
-				if err != nil {
-					return nil, err
-				}
-			} else if coder, ok := pointer.(BytesCodable); ok {
-				content, err = coder.MarshalBytes()
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				return nil, fmt.Errorf("unsupported struct type %s", field.Type().Name())
-			}
-		case reflect.Bool:
-			if field.Bool() {
-				content = []byte{1}
-			} else {
-				content = []byte{0}
-			}
-		default:
-			return nil, fmt.Errorf("unsupported type %s", field.Kind())
+		content, err := handle(field)
+		if err != nil {
+			return nil, err
 		}
-
+		if content == nil {
+			continue
+		}
 		result = append(result, byte(tlv))
 		result = append(result, byte(len(content)))
 		result = append(result, content...)
@@ -85,7 +92,6 @@ func MarshalTLV(v interface{}) ([]byte, error) {
 
 // UnmarshalTLV unmarshals a struct from TLV.
 // It will unmarshals all the field with tag "tlv".
-// The "tlv" tag value will be the type of the field.
 func UnmarshalTLV(v interface{}, data []byte) error {
 	result := make(map[byte][]byte)
 	for i := 0; i < len(data); {
@@ -111,6 +117,52 @@ func UnmarshalTLV(v interface{}, data []byte) error {
 		return fmt.Errorf("unmarshal requires a pointer to a struct")
 	}
 	val = reflect.Indirect(val)
+	var handle func(field reflect.Value, value []byte) error
+	handle = func(field reflect.Value, value []byte) error {
+		switch field.Kind() {
+		case reflect.String:
+			field.SetString(string(value))
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			i, err := strconv.ParseInt(string(value), 10, 64)
+			if err != nil {
+				return err
+			}
+			field.SetInt(i)
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			i, err := strconv.ParseUint(string(value), 10, 64)
+			if err != nil {
+				return err
+			}
+			field.SetUint(i)
+		case reflect.Bool:
+			field.SetBool(value[0] != 0)
+		case reflect.Ptr:
+			if field.IsNil() {
+				newValue := reflect.New(field.Type().Elem())
+				field.Set(newValue)
+			}
+			return handle(field.Elem(), value)
+		case reflect.Slice:
+			field.SetBytes(value)
+		default:
+			pointer := field.Addr().Interface()
+			if coder, ok := pointer.(TLVCodable); ok {
+				err := coder.UnmarshalTLV(value)
+				if err != nil {
+					return err
+				}
+			} else if coder, ok := pointer.(BytesCodable); ok {
+				err := coder.UnmarshalBytes(value)
+				if err != nil {
+					return err
+				}
+			} else {
+				return fmt.Errorf("unsupported type %s", field.Kind())
+			}
+		}
+		return nil
+	}
+
 	for i := 0; i < val.NumField(); i++ {
 		field := val.Field(i)
 		tag := val.Type().Field(i).Tag.Get("tlv")
@@ -127,40 +179,10 @@ func UnmarshalTLV(v interface{}, data []byte) error {
 			continue
 		}
 
-		switch field.Kind() {
-		case reflect.String:
-			field.SetString(string(content))
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			i, err := strconv.ParseInt(string(content), 10, 64)
-			if err != nil {
-				return err
-			}
-			field.SetInt(i)
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			i, err := strconv.ParseUint(string(content), 10, 64)
-			if err != nil {
-				return err
-			}
-			field.SetUint(i)
-		case reflect.Struct:
-			pointer := field.Addr().Interface()
-			if coder, ok := pointer.(TLVCodable); ok {
-				err := coder.UnmarshalTLV(content)
-				if err != nil {
-					return err
-				}
-			} else if coder, ok := pointer.(BytesCodable); ok {
-				err := coder.UnmarshalBytes(content)
-				if err != nil {
-					return err
-				}
-			} else {
-				return fmt.Errorf("unsupported struct type %s", field.Type().Name())
-			}
-		case reflect.Bool:
-			field.SetBool(content[0] != 0)
-		default:
-			return fmt.Errorf("unsupported type %s", field.Kind())
+		err = handle(field, content)
+
+		if err != nil {
+			return err
 		}
 	}
 

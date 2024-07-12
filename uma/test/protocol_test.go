@@ -251,3 +251,61 @@ usLY8crt6ys3KQ==
 	require.NoError(t, err)
 	require.Equal(t, keysOnlyPubKeyResponse, reserializedPubKeyResponse)
 }
+
+func TestBinaryCodableForCounterPartyDataOptions(t *testing.T) {
+	counterPartyDataOptions := umaprotocol.CounterPartyDataOptions{
+		"name":       umaprotocol.CounterPartyDataOption{Mandatory: false},
+		"email":      umaprotocol.CounterPartyDataOption{Mandatory: false},
+		"compliance": umaprotocol.CounterPartyDataOption{Mandatory: true},
+	}
+	result, err := counterPartyDataOptions.MarshalBytes()
+	require.NoError(t, err)
+
+	resultStr := string(result)
+	require.Equal(t, "name:0,email:0,compliance:1", resultStr)
+
+	counterPartyDataOptions2 := umaprotocol.CounterPartyDataOptions{}
+	err = counterPartyDataOptions2.UnmarshalBytes([]byte(resultStr))
+	require.NoError(t, err)
+	require.Equal(t, counterPartyDataOptions, counterPartyDataOptions2)
+}
+
+func TestUnsignInvoiceTLVCoding(t *testing.T) {
+	kyc := umaprotocol.KycStatusVerified
+	signature := []byte("signature")
+	invoicenvoice := umaprotocol.UmaInvoice{
+		ReceiverUma: "$foo@bar.com",
+		InvoiceUUID: "c7c07fec-cf00-431c-916f-6c13fc4b69f9",
+		Amount:      1000,
+		ReceivingCurrency: umaprotocol.InvoiceCurrency{
+			Code:   "USD",
+			Name:   "US Dollar",
+			Symbol: "$",
+		},
+		Expiration:            1000000,
+		IsSubjectToTravelRule: true,
+		RequiredPayerData: &umaprotocol.CounterPartyDataOptions{
+			"name":       umaprotocol.CounterPartyDataOption{Mandatory: false},
+			"email":      umaprotocol.CounterPartyDataOption{Mandatory: false},
+			"compliance": umaprotocol.CounterPartyDataOption{Mandatory: true},
+		},
+		UmaVersion:          "0.3",
+		CommentCharsAllowed: nil,
+		SenderUma:           nil,
+		InvoiceLimit:        nil,
+		KycStatus:           &kyc,
+		Signature:           &signature,
+	}
+
+	invoiceTLV, err := invoicenvoice.MarshalTLV()
+	require.NoError(t, err)
+
+	invoice2 := umaprotocol.UmaInvoice{}
+	err = invoice2.UnmarshalTLV(invoiceTLV)
+	require.NoError(t, err)
+	require.Equal(t, invoicenvoice, invoice2)
+
+	bech32String, err := invoice2.ToBech32String()
+	require.NoError(t, err)
+	require.Equal(t, "uma1qqxzgen0daqxyctj9e3k7mgpy33nwcesxanx2cedvdnrqvpdxsenzced8ycnve3dxe3nzvmxvv6xyd3evcusypp3xqcrqqcnqqp4256yqyy425eqg3hkcmrpwgpqzfqyqucnqvpsxqcrqpgpqyrpkcm0d4cxc6tpde3k2w3393hxzmt98gczcetdv95kcw3squpnqt3npvqnxeqfwd5kwmnpw36hyegr9rcpg", bech32String)
+}
