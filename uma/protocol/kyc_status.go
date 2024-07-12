@@ -52,3 +52,11 @@ func (k KycStatus) MarshalJSON() ([]byte, error) {
 	s := k.StringValue()
 	return json.Marshal(s)
 }
+
+func (k *KycStatus) MarshalBytes() ([]byte, error) {
+	return []byte(k.StringValue()), nil
+}
+
+func (k *KycStatus) UnmarshalBytes(b []byte) error {
+	return k.UnmarshalJSON(b)
+}

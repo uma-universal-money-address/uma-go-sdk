@@ -20,10 +20,12 @@ func (b *BinaryCodableStruct) UnmarshalBytes(data []byte) error {
 }
 
 type TLVUtilsTests struct {
-	StringField string `tlv:"0"`
-	IntField    int    `tlv:"1"`
-	BoolField   bool   `tlv:"2"`
-	UInt64Field uint64 `tlv:"3"`
+	StringField              string  `tlv:"0"`
+	IntField                 int     `tlv:"1"`
+	BoolField                bool    `tlv:"2"`
+	UInt64Field              uint64  `tlv:"3"`
+	OptionalStringField      *string `tlv:"6"`
+	OptionalEmptyStringField *string `tlv:"7"`
 }
 
 func (d *TLVUtilsTests) MarshalTLV() ([]byte, error) {
@@ -35,11 +37,14 @@ func (d *TLVUtilsTests) UnmarshalTLV(data []byte) error {
 }
 
 func TestSimpleTLVCoder(t *testing.T) {
+	str := "optional"
 	tlvUtilsTests := TLVUtilsTests{
-		StringField: "hello",
-		IntField:    42,
-		BoolField:   true,
-		UInt64Field: 123,
+		StringField:              "hello",
+		IntField:                 42,
+		BoolField:                true,
+		UInt64Field:              123,
+		OptionalStringField:      &str,
+		OptionalEmptyStringField: nil,
 	}
 
 	data, err := tlvUtilsTests.MarshalTLV()
@@ -67,6 +72,14 @@ func TestSimpleTLVCoder(t *testing.T) {
 
 	if tlvUtilsTests.UInt64Field != tlvUtilsTests2.UInt64Field {
 		t.Fatalf("expected %d, got %d", tlvUtilsTests.UInt64Field, tlvUtilsTests2.UInt64Field)
+	}
+
+	if *tlvUtilsTests.OptionalStringField != *tlvUtilsTests2.OptionalStringField {
+		t.Fatalf("expected %s, got %s", *tlvUtilsTests.OptionalStringField, *tlvUtilsTests2.OptionalStringField)
+	}
+
+	if tlvUtilsTests2.OptionalEmptyStringField != nil {
+		t.Fatalf("expected optional empty string field to be nil")
 	}
 }
 
