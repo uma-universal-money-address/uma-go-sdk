@@ -3,6 +3,7 @@ package uma_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/uma-universal-money-address/uma-go-sdk/uma/utils"
 )
 
@@ -26,6 +27,12 @@ type TLVUtilsTests struct {
 	UInt64Field              uint64  `tlv:"3"`
 	OptionalStringField      *string `tlv:"6"`
 	OptionalEmptyStringField *string `tlv:"7"`
+}
+
+type TLVUtilsTestsMissingField struct {
+	StringField string `tlv:"0"`
+	IntField    int    `tlv:"1"`
+	BoolField   bool   `tlv:"2"`
 }
 
 func (d *TLVUtilsTests) MarshalTLV() ([]byte, error) {
@@ -160,4 +167,21 @@ func TestNestedTLVCoder(t *testing.T) {
 		t.Fatalf("expected binary codable field to be 'binary', got %s", nestedTLVUtilsTests2.BinaryCodableField.Data)
 	}
 
+}
+
+func TestMissingFieldTLVCoder(t *testing.T) {
+	tlvUtilsTests := TLVUtilsTestsMissingField{
+		StringField: "hello",
+		IntField:    42,
+		BoolField:   true,
+	}
+
+	data, err := utils.MarshalTLV(&tlvUtilsTests)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var tlvUtilsTests2 TLVUtilsTests
+	err = utils.UnmarshalTLV(&tlvUtilsTests2, data)
+	require.Error(t, err)
 }

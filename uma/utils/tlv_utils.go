@@ -176,7 +176,11 @@ func UnmarshalTLV(v interface{}, data []byte) error {
 
 		content, ok := result[byte(tlv)]
 		if !ok {
-			continue
+			if field.Kind() == reflect.Ptr {
+				continue
+			} else {
+				return fmt.Errorf("missing TLV %d", tlv)
+			}
 		}
 
 		err = handle(field, content)
