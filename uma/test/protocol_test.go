@@ -262,7 +262,7 @@ func TestBinaryCodableForCounterPartyDataOptions(t *testing.T) {
 	require.NoError(t, err)
 
 	resultStr := string(result)
-	require.Equal(t, "name:0,email:0,compliance:1", resultStr)
+	require.Equal(t, "compliance:1,email:0,name:0", resultStr)
 
 	counterPartyDataOptions2 := umaprotocol.CounterPartyDataOptions{}
 	err = counterPartyDataOptions2.UnmarshalBytes([]byte(resultStr))
