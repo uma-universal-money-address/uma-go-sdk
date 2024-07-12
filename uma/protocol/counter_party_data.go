@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -39,6 +40,8 @@ func (c *CounterPartyDataOptions) MarshalBytes() ([]byte, error) {
 		}
 		pairs = append(pairs, str)
 	}
+
+	sort.Strings(pairs)
 
 	result := []byte(strings.Join(pairs, ","))
 	return result, nil

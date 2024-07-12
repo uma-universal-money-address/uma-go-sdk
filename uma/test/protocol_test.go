@@ -307,5 +307,5 @@ func TestUnsignInvoiceTLVCoding(t *testing.T) {
 
 	bech32String, err := invoice2.ToBech32String()
 	require.NoError(t, err)
-	require.Equal(t, "uma1qqxzgen0daqxyctj9e3k7mgpy33nwcesxanx2cedvdnrqvpdxsenzced8ycnve3dxe3nzvmxvv6xyd3evcusypp3xqcrqqcnqqp4256yqyy425eqg3hkcmrpwgpqzfqyqucnqvpsxqcrqpgpqyrpkcm0d4cxc6tpde3k2w3393hxzmt98gczcetdv95kcw3squpnqt3npvqnxeqfwd5kwmnpw36hyegr9rcpg", bech32String)
+	require.Equal(t, "uma1qqxzgen0daqxyctj9e3k7mgpy33nwcesxanx2cedvdnrqvpdxsenzced8ycnve3dxe3nzvmxvv6xyd3evcusypp3xqcrqqcnqqp4256yqyy425eqg3hkcmrpwgpqzfqyqucnqvpsxqcrqpgpqyrpkcm0d4cxc6tpde3k2w3393jk6ctfdsarqtrwv9kk2w3squpnqt3npvqnxeqfwd5kwmnpw36hyega7x5zz", bech32String)
 }
