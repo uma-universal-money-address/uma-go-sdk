@@ -270,7 +270,7 @@ func TestBinaryCodableForCounterPartyDataOptions(t *testing.T) {
 	require.Equal(t, counterPartyDataOptions, counterPartyDataOptions2)
 }
 
-func TestUnsignInvoiceTLVCoding(t *testing.T) {
+func TestUMAInvoiceTLVAndBech32(t *testing.T) {
 	kyc := umaprotocol.KycStatusVerified
 	signature := []byte("signature")
 	invoicenvoice := umaprotocol.UmaInvoice{
