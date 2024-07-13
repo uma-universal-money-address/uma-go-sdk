@@ -65,6 +65,9 @@ type UmaInvoice struct {
 	// KYC status of the receiver, default is verified.
 	KycStatus *KycStatus `tlv:"11"`
 
+	// The callback url that the sender should send the PayRequest to.
+	Callback string `tlv:"12"`
+
 	// The signature of the UMA invoice
 	Signature *[]byte `tlv:"100"`
 }
