@@ -804,3 +804,57 @@ func getPubKeyResponse(privateKey *secp256k1.PrivateKey) umaprotocol.PubKeyRespo
 		ExpirationTimestamp: nil,
 	}
 }
+
+func TestUMAInvoice(t *testing.T) {
+	privateKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err)
+
+	kyc := umaprotocol.KycStatusVerified
+	umaInvoice, err := uma.CreateUmaInvoice(
+		"$foo@bar.com",
+		100000,
+		umaprotocol.InvoiceCurrency{
+			Code:   "USD",
+			Name:   "US Dollar",
+			Symbol: "$",
+		},
+		1721081249,
+		"https://vasp2.com/api/lnurl/payreq/$foo",
+		true,
+		&umaprotocol.CounterPartyDataOptions{
+			"name":       umaprotocol.CounterPartyDataOption{Mandatory: false},
+			"email":      umaprotocol.CounterPartyDataOption{Mandatory: false},
+			"compliance": umaprotocol.CounterPartyDataOption{Mandatory: true},
+		},
+		nil,
+		&kyc,
+		nil,
+		nil,
+		privateKey.Serialize(),
+	)
+	require.NoError(t, err)
+
+	encodedInvoice, err := umaInvoice.ToBech32String()
+	require.NoError(t, err)
+
+	decodedInvoice, err := uma.DecodeUmaInvoice(encodedInvoice)
+	require.NoError(t, err)
+	require.Equal(t, decodedInvoice.ReceiverUma, "$foo@bar.com")
+	require.Equal(t, decodedInvoice.Amount, uint64(100000))
+	require.Equal(t, decodedInvoice.ReceivingCurrency.Code, "USD")
+	require.Equal(t, decodedInvoice.ReceivingCurrency.Name, "US Dollar")
+	require.Equal(t, decodedInvoice.ReceivingCurrency.Symbol, "$")
+	require.Equal(t, decodedInvoice.Expiration, uint64(1721081249))
+	require.Equal(t, decodedInvoice.Callback, "https://vasp2.com/api/lnurl/payreq/$foo")
+	require.Equal(t, decodedInvoice.IsSubjectToTravelRule, true)
+	require.Equal(t, *decodedInvoice.RequiredPayerData, umaprotocol.CounterPartyDataOptions{
+		"name":       umaprotocol.CounterPartyDataOption{Mandatory: false},
+		"email":      umaprotocol.CounterPartyDataOption{Mandatory: false},
+		"compliance": umaprotocol.CounterPartyDataOption{Mandatory: true},
+	})
+	require.Equal(t, *decodedInvoice.KycStatus, umaprotocol.KycStatusVerified)
+
+	publicKeyResponse := getPubKeyResponse(privateKey)
+	err = uma.VerifyUmaInvoiceSignature(*decodedInvoice, publicKeyResponse)
+	require.NoError(t, err)
+}

@@ -18,6 +18,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	eciesgo "github.com/ecies/go/v2"
+	"github.com/google/uuid"
 	"github.com/uma-universal-money-address/uma-go-sdk/uma/protocol"
 	"github.com/uma-universal-money-address/uma-go-sdk/uma/utils"
 )
@@ -115,7 +116,7 @@ func GenerateNonce() (*string, error) {
 	return &nonce, nil
 }
 
-func signPayload(payload []byte, privateKeyBytes []byte) (*string, error) {
+func signPayloadToBytes(payload []byte, privateKeyBytes []byte) ([]byte, error) {
 	privateKey := secp256k1.PrivKeyFromBytes(privateKeyBytes)
 	hash := crypto.SHA256.New()
 	_, err := hash.Write(payload)
@@ -124,6 +125,14 @@ func signPayload(payload []byte, privateKeyBytes []byte) (*string, error) {
 	}
 	hashedPayload := hash.Sum(nil)
 	signature, err := privateKey.ToECDSA().Sign(rand.Reader, hashedPayload, crypto.SHA256)
+	if err != nil {
+		return nil, err
+	}
+	return signature, nil
+}
+
+func signPayload(payload []byte, privateKeyBytes []byte) (*string, error) {
+	signature, err := signPayloadToBytes(payload, privateKeyBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -1010,4 +1019,65 @@ func VerifyPostTransactionCallbackSignature(
 		return err
 	}
 	return verifySignature(*signablePayload, *callback.Signature, otherVaspPubKeyResponse)
+}
+
+func CreateUmaInvoice(
+	receiverUma string,
+	amount uint64,
+	receivingCurrency protocol.InvoiceCurrency,
+	expiration uint64,
+	callback string,
+	isSubjectToTravelRule bool,
+	requiredPayerData *protocol.CounterPartyDataOptions,
+	commentCharsAllowed *int,
+	receiverKycStatus *protocol.KycStatus,
+	invoiceLimit *uint64,
+	senderUma *string,
+	signingPrivateKey []byte,
+) (*protocol.UmaInvoice, error) {
+	uuid := uuid.New().String()
+	invoice := protocol.UmaInvoice{
+		ReceiverUma:           receiverUma,
+		InvoiceUUID:           uuid,
+		Amount:                amount,
+		ReceivingCurrency:     receivingCurrency,
+		Expiration:            expiration,
+		IsSubjectToTravelRule: isSubjectToTravelRule,
+		RequiredPayerData:     requiredPayerData,
+		// TODO: modify the version once ready, all current version cannot support UMA invoice.
+		// Since this only add fields and features to the protocol, this won't break the current
+		// UMA version so it can be a minor version bump.
+		UmaVersion:          UmaProtocolVersion,
+		CommentCharsAllowed: commentCharsAllowed,
+		SenderUma:           senderUma,
+		InvoiceLimit:        invoiceLimit,
+		KycStatus:           receiverKycStatus,
+		Callback:            callback,
+		Signature:           nil,
+	}
+	signablePayload, err := invoice.MarshalTLV()
+	if err != nil {
+		return nil, err
+	}
+	signature, err := signPayloadToBytes(signablePayload, signingPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+	invoice.Signature = &signature
+	return &invoice, nil
+}
+
+func DecodeUmaInvoice(invoice string) (*protocol.UmaInvoice, error) {
+	return protocol.FromBech32String(invoice)
+}
+
+func VerifyUmaInvoiceSignature(invoice protocol.UmaInvoice, otherVaspPubKeyResponse protocol.PubKeyResponse) error {
+	unsignedInvoice := invoice
+	unsignedInvoice.Signature = nil
+	signablePayload, err := unsignedInvoice.MarshalTLV()
+	if err != nil {
+		return err
+	}
+	signatureString := hex.EncodeToString(*invoice.Signature)
+	return verifySignature(signablePayload, signatureString, otherVaspPubKeyResponse)
 }
