@@ -46,6 +46,9 @@ type PayRequest struct {
 	// if the receiver included the `commentAllowed` field in the lnurlp response. The length of
 	// the comment must be less than or equal to the value of `commentAllowed`.
 	Comment *string `json:"comment,omitempty"`
+	// InvoiceUUID is the invoice UUID that the sender is paying.
+	// This only exists in the v1 pay request since the v0 SDK won't support invoices.
+	InvoiceUUID *string `json:"invoiceUUID,omitempty"`
 	// UmaMajorVersion is the major version of the UMA protocol that the VASP supports for this currency. This is used
 	// for serialization, but is not serialized itself.
 	UmaMajorVersion int `json:"-"`
@@ -65,6 +68,7 @@ type v1PayRequest struct {
 	PayerData             *PayerData               `json:"payerData,omitempty"`
 	RequestedPayeeData    *CounterPartyDataOptions `json:"payeeData,omitempty"`
 	Comment               *string                  `json:"comment,omitempty"`
+	InvoiceUUID           *string                  `json:"invoiceUUID,omitempty"`
 }
 
 // IsUmaRequest returns true if the request is a valid UMA request, otherwise, if any fields are missing, it returns false.
