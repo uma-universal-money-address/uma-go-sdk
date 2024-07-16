@@ -273,7 +273,7 @@ func TestBinaryCodableForCounterPartyDataOptions(t *testing.T) {
 func TestUMAInvoiceTLVAndBech32(t *testing.T) {
 	kyc := umaprotocol.KycStatusVerified
 	signature := []byte("signature")
-	invoicenvoice := umaprotocol.UmaInvoice{
+	invoice := umaprotocol.UmaInvoice{
 		ReceiverUma: "$foo@bar.com",
 		InvoiceUUID: "c7c07fec-cf00-431c-916f-6c13fc4b69f9",
 		Amount:      1000,
@@ -298,15 +298,19 @@ func TestUMAInvoiceTLVAndBech32(t *testing.T) {
 		Signature:           &signature,
 	}
 
-	invoiceTLV, err := invoicenvoice.MarshalTLV()
+	invoiceTLV, err := invoice.MarshalTLV()
 	require.NoError(t, err)
 
 	invoice2 := umaprotocol.UmaInvoice{}
 	err = invoice2.UnmarshalTLV(invoiceTLV)
 	require.NoError(t, err)
-	require.Equal(t, invoicenvoice, invoice2)
+	require.Equal(t, invoice, invoice2)
 
 	bech32String, err := invoice2.ToBech32String()
 	require.NoError(t, err)
 	require.Equal(t, "uma1qqxzgen0daqxyctj9e3k7mgpy33nwcesxanx2cedvdnrqvpdxsenzced8ycnve3dxe3nzvmxvv6xyd3evcusypp3xqcrqqcnqqp4256yqyy425eqg3hkcmrpwgpqzfqyqucnqvpsxqcrqpgpqyrpkcm0d4cxc6tpde3k2w3393jk6ctfdsarqtrwv9kk2w3squpnqt3npvqnxrqudp68gurn8ghj7etcv9khqmr99e3k7mf0vdskcmrzv93kkeqfwd5kwmnpw36hyeg0e4m4j", bech32String)
+
+	invoice3, err := umaprotocol.FromBech32String(bech32String)
+	require.NoError(t, err)
+	require.Equal(t, invoice, *invoice3)
 }

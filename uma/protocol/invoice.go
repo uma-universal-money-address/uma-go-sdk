@@ -3,7 +3,7 @@ package protocol
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcutil/bech32"
+	"github.com/decred/dcrd/bech32"
 	"github.com/uma-universal-money-address/uma-go-sdk/uma/utils"
 )
 
@@ -94,4 +94,24 @@ func (i *UmaInvoice) ToBech32String() (string, error) {
 	}
 
 	return bech32.Encode("uma", conv)
+}
+
+func FromBech32String(bech32Str string) (*UmaInvoice, error) {
+	hrp, data, err := bech32.DecodeNoLimit(bech32Str)
+	if err != nil {
+		return nil, err
+	}
+	if hrp != "uma" {
+		return nil, fmt.Errorf("invalid human readable part")
+	}
+	conv, err := bech32.ConvertBits(data, 5, 8, false)
+	if err != nil {
+		return nil, err
+	}
+	var i UmaInvoice
+	err = i.UnmarshalTLV(conv)
+	if err != nil {
+		return nil, err
+	}
+	return &i, nil
 }
