@@ -727,7 +727,7 @@ func ParsePayRequest(bytes []byte) (*protocol.PayRequest, error) {
 }
 
 type InvoiceCreator interface {
-	CreateInvoice(amountMsats int64, metadata string) (*string, error)
+	CreateInvoice(amountMsats int64, metadata string, receiverIdentifier *string) (*string, error)
 }
 
 func addInvoiceUUIDToMetadata(metadata string, invoiceUUID string) (string, error) {
@@ -827,7 +827,7 @@ func GetPayReqResponse(
 			return nil, err
 		}
 	}
-	encodedInvoice, err := invoiceCreator.CreateInvoice(msatsAmount, metadata+payerDataStr)
+	encodedInvoice, err := invoiceCreator.CreateInvoice(msatsAmount, metadata+payerDataStr, payeeIdentifier)
 	if err != nil {
 		return nil, err
 	}
