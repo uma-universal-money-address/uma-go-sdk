@@ -355,7 +355,7 @@ func TestMsatsPayReqCreationAndParsing(t *testing.T) {
 
 type FakeInvoiceCreator struct{}
 
-func (f *FakeInvoiceCreator) CreateInvoice(int64, string) (*string, error) {
+func (f *FakeInvoiceCreator) CreateInvoice(int64, string, *string) (*string, error) {
 	encodedInvoice := "lnbcrt100n1p0z9j"
 	return &encodedInvoice, nil
 }
