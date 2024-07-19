@@ -32,33 +32,33 @@ func MarshalTLV(v interface{}) ([]byte, error) {
 
 	var handle func(field reflect.Value) ([]byte, error)
 	handle = func(field reflect.Value) ([]byte, error) {
-		switch field.Kind() {
-		case reflect.String:
-			return []byte(field.String()), nil
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			return []byte(strconv.FormatInt(field.Int(), 10)), nil
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			return []byte(strconv.FormatUint(field.Uint(), 10)), nil
-		case reflect.Bool:
-			if field.Bool() {
-				return []byte{1}, nil
-			} else {
-				return []byte{0}, nil
-			}
-		case reflect.Ptr:
-			if field.IsNil() {
-				return nil, nil
-			}
-			return handle(reflect.Indirect(field))
-		case reflect.Slice:
-			return field.Bytes(), nil
-		default:
-			pointer := field.Addr().Interface()
-			if coder, ok := pointer.(TLVCodable); ok {
-				return coder.MarshalTLV()
-			} else if coder, ok := pointer.(BytesCodable); ok {
-				return coder.MarshalBytes()
-			} else {
+		pointer := field.Addr().Interface()
+		if coder, ok := pointer.(TLVCodable); ok {
+			return coder.MarshalTLV()
+		} else if coder, ok := pointer.(BytesCodable); ok {
+			return coder.MarshalBytes()
+		} else {
+			switch field.Kind() {
+			case reflect.String:
+				return []byte(field.String()), nil
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				return []byte(strconv.FormatInt(field.Int(), 10)), nil
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				return []byte(strconv.FormatUint(field.Uint(), 10)), nil
+			case reflect.Bool:
+				if field.Bool() {
+					return []byte{1}, nil
+				} else {
+					return []byte{0}, nil
+				}
+			case reflect.Ptr:
+				if field.IsNil() {
+					return nil, nil
+				}
+				return handle(reflect.Indirect(field))
+			case reflect.Slice:
+				return field.Bytes(), nil
+			default:
 				return nil, fmt.Errorf("unsupported type %s", field.Kind())
 			}
 		}
@@ -119,44 +119,44 @@ func UnmarshalTLV(v interface{}, data []byte) error {
 	val = reflect.Indirect(val)
 	var handle func(field reflect.Value, value []byte) error
 	handle = func(field reflect.Value, value []byte) error {
-		switch field.Kind() {
-		case reflect.String:
-			field.SetString(string(value))
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			i, err := strconv.ParseInt(string(value), 10, 64)
+		pointer := field.Addr().Interface()
+		if coder, ok := pointer.(TLVCodable); ok {
+			err := coder.UnmarshalTLV(value)
 			if err != nil {
 				return err
 			}
-			field.SetInt(i)
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			i, err := strconv.ParseUint(string(value), 10, 64)
+		} else if coder, ok := pointer.(BytesCodable); ok {
+			err := coder.UnmarshalBytes(value)
 			if err != nil {
 				return err
 			}
-			field.SetUint(i)
-		case reflect.Bool:
-			field.SetBool(value[0] != 0)
-		case reflect.Ptr:
-			if field.IsNil() {
-				newValue := reflect.New(field.Type().Elem())
-				field.Set(newValue)
-			}
-			return handle(field.Elem(), value)
-		case reflect.Slice:
-			field.SetBytes(value)
-		default:
-			pointer := field.Addr().Interface()
-			if coder, ok := pointer.(TLVCodable); ok {
-				err := coder.UnmarshalTLV(value)
+		} else {
+			switch field.Kind() {
+			case reflect.String:
+				field.SetString(string(value))
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				i, err := strconv.ParseInt(string(value), 10, 64)
 				if err != nil {
 					return err
 				}
-			} else if coder, ok := pointer.(BytesCodable); ok {
-				err := coder.UnmarshalBytes(value)
+				field.SetInt(i)
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				i, err := strconv.ParseUint(string(value), 10, 64)
 				if err != nil {
 					return err
 				}
-			} else {
+				field.SetUint(i)
+			case reflect.Bool:
+				field.SetBool(value[0] != 0)
+			case reflect.Ptr:
+				if field.IsNil() {
+					newValue := reflect.New(field.Type().Elem())
+					field.Set(newValue)
+				}
+				return handle(field.Elem(), value)
+			case reflect.Slice:
+				field.SetBytes(value)
+			default:
 				return fmt.Errorf("unsupported type %s", field.Kind())
 			}
 		}
