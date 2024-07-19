@@ -58,5 +58,18 @@ func (k *KycStatus) MarshalBytes() ([]byte, error) {
 }
 
 func (k *KycStatus) UnmarshalBytes(b []byte) error {
-	return k.UnmarshalJSON(b)
+	s := string(b)
+	switch s {
+	default:
+		*k = KycStatusUnknown
+	case "UNKNOWN":
+		*k = KycStatusUnknown
+	case "NOT_VERIFIED":
+		*k = KycStatusNotVerified
+	case "PENDING":
+		*k = KycStatusPending
+	case "VERIFIED":
+		*k = KycStatusVerified
+	}
+	return nil
 }
