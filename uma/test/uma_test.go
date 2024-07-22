@@ -814,9 +814,10 @@ func TestUMAInvoice(t *testing.T) {
 		"$foo@bar.com",
 		100000,
 		umaprotocol.InvoiceCurrency{
-			Code:   "USD",
-			Name:   "US Dollar",
-			Symbol: "$",
+			Code:     "USD",
+			Name:     "US Dollar",
+			Symbol:   "$",
+			Decimals: 2,
 		},
 		1721081249,
 		"https://vasp2.com/api/lnurl/payreq/$foo",
