@@ -17,6 +17,9 @@ type InvoiceCurrency struct {
 
 	// Symbol is the symbol of the currency (eg. $ for USD).
 	Symbol string `tlv:"2"`
+
+	// Decimals is the number of digits after the decimal point for display on the sender side
+	Decimals uint8 `tlv:"3"`
 }
 
 func (c *InvoiceCurrency) MarshalTLV() ([]byte, error) {

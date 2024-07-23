@@ -278,9 +278,10 @@ func TestUMAInvoiceTLVAndBech32(t *testing.T) {
 		InvoiceUUID: "c7c07fec-cf00-431c-916f-6c13fc4b69f9",
 		Amount:      1000,
 		ReceivingCurrency: umaprotocol.InvoiceCurrency{
-			Code:   "USD",
-			Name:   "US Dollar",
-			Symbol: "$",
+			Code:     "USD",
+			Name:     "US Dollar",
+			Symbol:   "$",
+			Decimals: 2,
 		},
 		Expiration:            1000000,
 		IsSubjectToTravelRule: true,
@@ -308,7 +309,7 @@ func TestUMAInvoiceTLVAndBech32(t *testing.T) {
 
 	bech32String, err := invoice2.ToBech32String()
 	require.NoError(t, err)
-	require.Equal(t, "uma1qqxzgen0daqxyctj9e3k7mgpy33nwcesxanx2cedvdnrqvpdxsenzced8ycnve3dxe3nzvmxvv6xyd3evcusypp3xqcrqqcnqqp4256yqyy425eqg3hkcmrpwgpqzfqyqucnqvpsxqcrqpgpqyrpkcm0d4cxc6tpde3k2w3393jk6ctfdsarqtrwv9kk2w3squpnqt3npvy9v32jf9ryj32ypswxsar5wpen5te0v4uxzmtsd3jjucm0d5hkxctvd33xzcmtvsyhx6t8deshgatjv5sjy5ff", bech32String)
+	require.Equal(t, "uma1qqxzgen0daqxyctj9e3k7mgpy33nwcesxanx2cedvdnrqvpdxsenzced8ycnve3dxe3nzvmxvv6xyd3evcusypp3xqcrqqckqqp4256yqyy425eqg3hkcmrpwgpqzfqrqyeqgpe3xqcrqvpsxqzszqgxrd3k7mtsd35kzmnrv5arztr9d4skjmp6xqkxuctdv5arqpcrxqhrxzcg2ez4yj2xf9z5grqudp68gurn8ghj7etcv9khqmr99e3k7mf0vdskcmrzv93kkeqfwd5kwmnpw36hyegy0tgay", bech32String)
 
 	invoice3, err := umaprotocol.FromBech32String(bech32String)
 	require.NoError(t, err)
