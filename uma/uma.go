@@ -736,7 +736,7 @@ func addInvoiceUUIDToMetadata(metadata string, invoiceUUID string) (string, erro
 	if err != nil {
 		return "", err
 	}
-	invoice := []interface{}{"text/plain", invoiceUUID}
+	invoice := []interface{}{"text/uma-invoice", invoiceUUID}
 	data = append(data, invoice)
 	updatedJSON, err := json.Marshal(data)
 	if err != nil {
