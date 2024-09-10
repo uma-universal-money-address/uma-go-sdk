@@ -1142,10 +1142,10 @@ func CreateUmaInvoice(
 		// TODO: modify the version once ready, all current version cannot support UMA invoice.
 		// Since this only add fields and features to the protocol, this won't break the current
 		// UMA version so it can be a minor version bump.
-		UmaVersion:          UmaProtocolVersion,
+		UmaVersions:         UmaProtocolVersion,
 		CommentCharsAllowed: commentCharsAllowed,
 		SenderUma:           senderUma,
-		InvoiceLimit:        invoiceLimit,
+		MaxNumPayments:      invoiceLimit,
 		KycStatus:           receiverKycStatus,
 		Callback:            callback,
 		Signature:           nil,
