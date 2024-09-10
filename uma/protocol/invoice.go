@@ -52,9 +52,9 @@ type UmaInvoice struct {
 	// RequiredPayerData the data about the payer that the sending VASP must provide in order to send a payment.
 	RequiredPayerData *CounterPartyDataOptions `tlv:"6"`
 
-	// UmaVersion is a list of UMA versions that the VASP supports for this transaction. It should be
-	// containing the lowest minor version of each major version it supported, separated by commas.
-	UmaVersion string `tlv:"7"`
+	// UmaVersions is a list of UMA versions that the VASP supports for this transaction. It should be
+	// containing the highest minor version of each major version it supported, separated by commas.
+	UmaVersions string `tlv:"7"`
 
 	// CommentCharsAllowed is the number of characters that the sender can include in the comment field of the pay request.
 	CommentCharsAllowed *int `tlv:"8"`
@@ -63,7 +63,7 @@ type UmaInvoice struct {
 	SenderUma *string `tlv:"9"`
 
 	// The maximum number of the invoice can be paid
-	InvoiceLimit *uint64 `tlv:"10"`
+	MaxNumPayments *uint64 `tlv:"10"`
 
 	// KYC status of the receiver, default is verified.
 	KycStatus *KycStatus `tlv:"11"`
