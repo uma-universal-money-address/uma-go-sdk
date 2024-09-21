@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -313,7 +314,12 @@ func ParseLnurlpRequestWithReceiverDomain(url url.URL, receiverDomain string) (*
 	if len(pathParts) != 4 || pathParts[1] != ".well-known" || pathParts[2] != "lnurlp" {
 		return nil, errors.New("invalid uma request path")
 	}
-	receiverAddress := pathParts[3] + "@" + receiverDomain
+	username := pathParts[3]
+	var validUsernameRegex = regexp.MustCompile(`^[$a-zA-Z0-9._\-+]+$`)
+	if !validUsernameRegex.MatchString(username) {
+		return nil, errors.New("invalid uma username")
+	}
+	receiverAddress := username + "@" + receiverDomain
 
 	nilIfEmpty := func(s string) *string {
 		if s == "" {
