@@ -44,6 +44,13 @@ func TestParse(t *testing.T) {
 	assert.ObjectsAreEqual(expectedQuery, *query)
 }
 
+func TestInvalidUserName(t *testing.T) {
+	urlString := "https://vasp2.com/.well-known/lnurlp/bob<>%20?signature=signature&nonce=12345&vaspDomain=vasp1.com&umaVersion=1.0&isSubjectToTravelRule=true&timestamp=12345678"
+	urlObj, _ := url.Parse(urlString)
+	_, err := uma.ParseLnurlpRequest(*urlObj)
+	require.Error(t, err)
+}
+
 func TestIsUmaQueryValid(t *testing.T) {
 	urlString := "https://vasp2.com/.well-known/lnurlp/bob?signature=signature&nonce=12345&vaspDomain=vasp1.com&umaVersion=1.0&isSubjectToTravelRule=true&timestamp=12345678"
 	urlObj, _ := url.Parse(urlString)
