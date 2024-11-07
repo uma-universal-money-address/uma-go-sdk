@@ -411,9 +411,9 @@ func GetLnurlpResponse(
 	// Ensure currencies are correctly serialized:
 	if umaVersion != nil {
 		umaVersionParsed, err := ParseVersion(*umaVersion)
-		if err != nil && umaVersionParsed != nil && umaVersionParsed.Major == 0 {
+		if err == nil && umaVersionParsed != nil {
 			for i := range *currencyOptions {
-				(*currencyOptions)[i].UmaMajorVersion = 0
+				(*currencyOptions)[i].UmaMajorVersion = umaVersionParsed.Major
 			}
 		}
 	}
