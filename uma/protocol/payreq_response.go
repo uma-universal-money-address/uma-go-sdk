@@ -3,6 +3,7 @@ package protocol
 import (
 	"encoding/json"
 	"errors"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/utils"
 )
 
 // PayReqResponse is the response sent by the receiver to the sender to provide an invoice.
@@ -207,5 +208,50 @@ func (p *PayReqResponse) UnmarshalJSON(data []byte) error {
 	p.PayeeData = v1.PayeeData
 	p.Disposable = v1.Disposable
 	p.SuccessAction = v1.SuccessAction
+	return nil
+}
+
+// Append a backing signature to the PayReqResponse.
+//
+// Args:
+//
+//	signingPrivateKey: the private key to use to sign the payload.
+//	domain: the domain of the VASP that is signing the payload. The associated public key will be fetched from
+//	/.well-known/lnurlpubkey on this domain to verify the signature.
+//	payerIdentifier: the identifier of the sender. For example, $alice@vasp1.com
+//	payeeIdentifier: the identifier of the receiver. For example, $bob@vasp2.com
+func (p *PayReqResponse) AppendBackingSignature(
+	signingPrivateKey []byte,
+	domain string,
+	payerIdentifier string,
+	payeeIdentifier string,
+) error {
+	complianceData, err := p.PayeeData.Compliance()
+	if err != nil {
+		return err
+	}
+	if complianceData == nil {
+		return errors.New("compliance payee data is missing")
+	}
+	signablePayload, err := complianceData.SignablePayload(payerIdentifier, payeeIdentifier)
+	if err != nil {
+		return err
+	}
+	signature, err := utils.SignPayload(signablePayload, signingPrivateKey)
+	if err != nil {
+		return err
+	}
+	if complianceData.BackingSignatures == nil {
+		complianceData.BackingSignatures = &[]BackingSignature{}
+	}
+	*complianceData.BackingSignatures = append(*complianceData.BackingSignatures, BackingSignature{
+		Signature: *signature,
+		Domain:    domain,
+	})
+	complianceMap, err := complianceData.AsMap()
+	if err != nil {
+		return err
+	}
+	(*p.PayeeData)["compliance"] = complianceMap
 	return nil
 }

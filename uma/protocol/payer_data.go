@@ -107,6 +107,8 @@ type CompliancePayerData struct {
 	SignatureTimestamp int64  `json:"signatureTimestamp"`
 	// UtxoCallback is the URL that the receiver will call to send UTXOs of the channel that the receiver used to receive the payment once it completes.
 	UtxoCallback string `json:"utxoCallback"`
+	// BackingSignatures is the list of backing signatures from VASPs that can attest to the authenticity of the message.
+	BackingSignatures *[]BackingSignature `json:"backingSignatures,omitempty"`
 }
 
 func (c *CompliancePayerData) AsMap() (map[string]interface{}, error) {

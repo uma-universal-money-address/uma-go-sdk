@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/utils"
 	"strconv"
 	"strings"
 )
@@ -46,6 +47,8 @@ type LnurlComplianceResponse struct {
 	IsSubjectToTravelRule bool `json:"isSubjectToTravelRule"`
 	// ReceiverIdentifier is the identifier of the receiver at VASP2.
 	ReceiverIdentifier string `json:"receiverIdentifier"`
+	// BackingSignatures is the list of backing signatures from VASPs that can attest to the authenticity of the message.
+	BackingSignatures *[]BackingSignature `json:"backingSignatures,omitempty"`
 }
 
 func (r *LnurlpResponse) IsUmaResponse() bool {
@@ -98,4 +101,26 @@ func (r *UmaLnurlpResponse) SignablePayload() []byte {
 		strconv.FormatInt(r.Compliance.Timestamp, 10),
 	}, "|")
 	return []byte(payloadString)
+}
+
+// Append a backing signature to the UmaLnurlpResponse.
+//
+// Args:
+//
+//	signingPrivateKey: the private key to use to sign the payload.
+//	domain: the domain of the VASP that is signing the payload. The associated public key will be fetched from
+//	/.well-known/lnurlpubkey on this domain to verify the signature.
+func (r *UmaLnurlpResponse) AppendBackingSignature(signingPrivateKey []byte, domain string) error {
+	signature, err := utils.SignPayload(r.SignablePayload(), signingPrivateKey)
+	if err != nil {
+		return err
+	}
+	if r.Compliance.BackingSignatures == nil {
+		r.Compliance.BackingSignatures = &[]BackingSignature{}
+	}
+	*r.Compliance.BackingSignatures = append(*r.Compliance.BackingSignatures, BackingSignature{
+		Signature: *signature,
+		Domain:    domain,
+	})
+	return nil
 }
