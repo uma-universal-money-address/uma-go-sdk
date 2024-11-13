@@ -122,5 +122,8 @@ func (r *UmaLnurlpResponse) AppendBackingSignature(signingPrivateKey []byte, dom
 		Signature: *signature,
 		Domain:    domain,
 	})
+	if r.LnurlpResponse.Compliance != nil {
+		r.LnurlpResponse.Compliance.BackingSignatures = r.Compliance.BackingSignatures
+	}
 	return nil
 }
