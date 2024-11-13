@@ -117,31 +117,7 @@ func GenerateNonce() (*string, error) {
 	return &nonce, nil
 }
 
-func signPayloadToBytes(payload []byte, privateKeyBytes []byte) ([]byte, error) {
-	privateKey := secp256k1.PrivKeyFromBytes(privateKeyBytes)
-	hash := crypto.SHA256.New()
-	_, err := hash.Write(payload)
-	if err != nil {
-		return nil, err
-	}
-	hashedPayload := hash.Sum(nil)
-	signature, err := privateKey.ToECDSA().Sign(rand.Reader, hashedPayload, crypto.SHA256)
-	if err != nil {
-		return nil, err
-	}
-	return signature, nil
-}
-
-func signPayload(payload []byte, privateKeyBytes []byte) (*string, error) {
-	signature, err := signPayloadToBytes(payload, privateKeyBytes)
-	if err != nil {
-		return nil, err
-	}
-	signatureString := hex.EncodeToString(signature)
-	return &signatureString, nil
-}
-
-// VerifyPayReqSignature Verifies the signature on an uma pay request based on the public key of the VASP making the
+// VerifyPayReqSignature Verifies the primary signature on an uma pay request based on the public key of the VASP making the
 // request.
 //
 // Args:
@@ -169,6 +145,39 @@ func VerifyPayReqSignature(query *protocol.PayRequest, otherVaspPubKeyResponse p
 		return err
 	}
 	return verifySignature(signablePayload, complianceData.Signature, otherVaspPubKeyResponse)
+}
+
+// VerifyPayReqBackingSignatures Verifies the backing signatures on a PayRequest. You may optionally
+// call this function after VerifyPayReqSignature to verify signatures from backing VASPs.
+//
+// Args:
+//
+//	query: the signed query to verify.
+//	publicKeyCache: the PublicKeyCache cache to use. You can use the InMemoryPublicKeyCache struct, or
+//	implement your own persistent cache with any storage type.
+func VerifyPayReqBackingSignatures(query *protocol.PayRequest, publicKeyCache PublicKeyCache) error {
+	complianceData, err := query.PayerData.Compliance()
+	if err != nil {
+		return err
+	}
+	if complianceData.BackingSignatures == nil {
+		return nil
+	}
+	signablePayload, err := query.SignablePayload()
+	if err != nil {
+		return err
+	}
+	for _, backingSignature := range *complianceData.BackingSignatures {
+		backingVaspPubKeyResponse, err := FetchPublicKeyForVasp(backingSignature.Domain, publicKeyCache)
+		if err != nil {
+			return err
+		}
+		err = verifySignature(signablePayload, backingSignature.Signature, *backingVaspPubKeyResponse)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // verifySignature Verifies the signature of the uma request.
@@ -247,7 +256,7 @@ func GetSignedLnurlpRequestUrl(
 	if err != nil {
 		return nil, err
 	}
-	signature, err := signPayload(signablePayload, signingPrivateKey)
+	signature, err := utils.SignPayload(signablePayload, signingPrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -285,14 +294,15 @@ func ParseLnurlpRequest(url url.URL) (*protocol.LnurlpRequest, error) {
 //
 //	url: the full URL of the uma request.
 //	receiverDomain: the domain of the receiver UMA of the payment. This is used to override the domain in the URL.
-func ParseLnurlpRequestWithReceiverDomain(url url.URL, receiverDomain string) (*protocol.LnurlpRequest, error) {
-	query := url.Query()
+func ParseLnurlpRequestWithReceiverDomain(requestUrl url.URL, receiverDomain string) (*protocol.LnurlpRequest, error) {
+	query := requestUrl.Query()
 	signature := query.Get("signature")
 	vaspDomain := query.Get("vaspDomain")
 	nonce := query.Get("nonce")
 	isSubjectToTravelRule := strings.ToLower(query.Get("isSubjectToTravelRule")) == "true"
 	umaVersion := query.Get("umaVersion")
 	timestamp := query.Get("timestamp")
+	backingSignatures := query.Get("backingSignatures")
 	var timestampAsTime *time.Time
 	if timestamp != "" {
 		timestampAsString, dateErr := strconv.ParseInt(timestamp, 10, 64)
@@ -310,7 +320,7 @@ func ParseLnurlpRequestWithReceiverDomain(url url.URL, receiverDomain string) (*
 		}
 	}
 
-	pathParts := strings.Split(url.Path, "/")
+	pathParts := strings.Split(requestUrl.Path, "/")
 	if len(pathParts) != 4 || pathParts[1] != ".well-known" || pathParts[2] != "lnurlp" {
 		return nil, errors.New("invalid uma request path")
 	}
@@ -328,6 +338,29 @@ func ParseLnurlpRequestWithReceiverDomain(url url.URL, receiverDomain string) (*
 		return &s
 	}
 
+	var backingSignaturesParsed *[]protocol.BackingSignature
+	if backingSignatures != "" {
+		pairs := strings.Split(backingSignatures, ",")
+		signatures := make([]protocol.BackingSignature, len(pairs))
+		for i, pair := range pairs {
+			decodedPair, err := url.QueryUnescape(pair)
+			if err != nil {
+				return nil, errors.New("invalid backing signature format")
+			}
+
+			lastColonIndex := strings.LastIndex(decodedPair, ":")
+			if lastColonIndex == -1 {
+				return nil, errors.New("invalid backing signature format")
+			}
+
+			signatures[i] = protocol.BackingSignature{
+				Domain:    decodedPair[:lastColonIndex],
+				Signature: decodedPair[lastColonIndex+1:],
+			}
+		}
+		backingSignaturesParsed = &signatures
+	}
+
 	return &protocol.LnurlpRequest{
 		ReceiverAddress:       receiverAddress,
 		VaspDomain:            nilIfEmpty(vaspDomain),
@@ -336,10 +369,11 @@ func ParseLnurlpRequestWithReceiverDomain(url url.URL, receiverDomain string) (*
 		Nonce:                 nilIfEmpty(nonce),
 		Timestamp:             timestampAsTime,
 		IsSubjectToTravelRule: &isSubjectToTravelRule,
+		BackingSignatures:     backingSignaturesParsed,
 	}, nil
 }
 
-// VerifyUmaLnurlpQuerySignature Verifies the signature on an uma Lnurlp query based on the public key of the VASP making the request.
+// VerifyUmaLnurlpQuerySignature Verifies the primary signature on an uma Lnurlp query based on the public key of the VASP making the request.
 //
 // Args:
 //
@@ -356,6 +390,35 @@ func VerifyUmaLnurlpQuerySignature(query protocol.UmaLnurlpRequest, otherVaspPub
 		return err
 	}
 	return verifySignature(signablePayload, query.Signature, otherVaspPubKeyResponse)
+}
+
+// VerifyUmaLnurlpQueryBackingSignatures Verifies the backing signatures on an UmaLnurlpRequest. You may optionally
+// call this function after VerifyUmaLnurlpQuerySignature to verify signatures from backing VASPs.
+//
+// Args:
+//
+//	query: the signed query to verify.
+//	publicKeyCache: the PublicKeyCache cache to use. You can use the InMemoryPublicKeyCache struct, or implement
+//	your own persistent cache with any storage type.
+func VerifyUmaLnurlpQueryBackingSignatures(query protocol.UmaLnurlpRequest, publicKeyCache PublicKeyCache) error {
+	if query.BackingSignatures == nil {
+		return nil
+	}
+	signablePayload, err := query.SignablePayload()
+	if err != nil {
+		return err
+	}
+	for _, backingSignature := range *query.BackingSignatures {
+		backingVaspPubKeyResponse, err := FetchPublicKeyForVasp(backingSignature.Domain, publicKeyCache)
+		if err != nil {
+			return err
+		}
+		err = verifySignature(signablePayload, backingSignature.Signature, *backingVaspPubKeyResponse)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func GetLnurlpResponse(
@@ -451,7 +514,7 @@ func getSignedLnurlpComplianceResponse(
 		return nil, err
 	}
 	payloadString := strings.Join([]string{query.ReceiverAddress, *nonce, strconv.FormatInt(timestamp, 10)}, "|")
-	signature, err := signPayload([]byte(payloadString), privateKeyBytes)
+	signature, err := utils.SignPayload([]byte(payloadString), privateKeyBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -465,7 +528,7 @@ func getSignedLnurlpComplianceResponse(
 	}, nil
 }
 
-// VerifyUmaLnurlpResponseSignature Verifies the signature on an uma Lnurlp response based on the public key of the VASP making the request.
+// VerifyUmaLnurlpResponseSignature Verifies the primary signature on an uma Lnurlp response based on the public key of the VASP making the request.
 //
 // Args:
 //
@@ -478,6 +541,32 @@ func VerifyUmaLnurlpResponseSignature(response protocol.UmaLnurlpResponse, other
 		return err
 	}
 	return verifySignature(response.SignablePayload(), response.Compliance.Signature, otherVaspPubKeyResponse)
+}
+
+// VerifyUmaLnurlpResponseBackingSignatures Verifies the backing signatures on an UmaLnurlpResponse. You may optionally
+// call this function after VerifyUmaLnurlpResponseSignature to verify signatures from backing VASPs.
+//
+// Args:
+//
+//	response: the signed response to verify.
+//	publicKeyCache: the PublicKeyCache cache to use. You can use the InMemoryPublicKeyCache struct, or implement your
+//	own persistent cache with any storage type.
+func VerifyUmaLnurlpResponseBackingSignatures(response protocol.UmaLnurlpResponse, publicKeyCache PublicKeyCache) error {
+	if response.Compliance.BackingSignatures == nil {
+		return nil
+	}
+	signablePayload := response.SignablePayload()
+	for _, backingSignature := range *response.Compliance.BackingSignatures {
+		backingVaspPubKeyResponse, err := FetchPublicKeyForVasp(backingSignature.Domain, publicKeyCache)
+		if err != nil {
+			return err
+		}
+		err = verifySignature(signablePayload, backingSignature.Signature, *backingVaspPubKeyResponse)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func ParseLnurlpResponse(bytes []byte) (*protocol.LnurlpResponse, error) {
@@ -690,7 +779,7 @@ func getSignedCompliancePayerData(
 		}
 	}
 	payloadString := strings.Join([]string{payerIdentifier, *nonce, strconv.FormatInt(timestamp, 10)}, "|")
-	signature, err := signPayload([]byte(payloadString), sendingVaspPrivateKeyBytes)
+	signature, err := utils.SignPayload([]byte(payloadString), sendingVaspPrivateKeyBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -992,7 +1081,7 @@ func getSignedCompliancePayeeData(
 	if err != nil {
 		return nil, err
 	}
-	signature, err := signPayload([]byte(payloadString), receivingVaspPrivateKeyBytes)
+	signature, err := utils.SignPayload([]byte(payloadString), receivingVaspPrivateKeyBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -1051,6 +1140,46 @@ func VerifyPayReqResponseSignature(
 	return verifySignature(signablePayload, *complianceData.Signature, otherVaspPubKeyResponse)
 }
 
+// VerifyPayReqResponseBackingSignatures Verifies the backing signatures on a PayReqResponse. You may optionally
+// call this function after VerifyPayReqResponseSignature to verify signatures from backing VASPs.
+//
+// Args:
+//
+//	query: the signed query to verify.
+//	publicKeyCache: the PublicKeyCache cache to use. You can use the InMemoryPublicKeyCache struct, or
+//	implement your own persistent cache with any storage type.
+//	payerIdentifier: the identifier of the sender. For example, $alice@vasp1.com
+//	payeeIdentifier: the identifier of the receiver. For example, $bob@vasp2.com
+func VerifyPayReqResponseBackingSignatures(
+	response *protocol.PayReqResponse,
+	publicKeyCache PublicKeyCache,
+	payerIdentifier string,
+	payeeIdentifier string,
+) error {
+	complianceData, err := response.PayeeData.Compliance()
+	if err != nil {
+		return err
+	}
+	if complianceData.BackingSignatures == nil {
+		return nil
+	}
+	signablePayload, err := complianceData.SignablePayload(payerIdentifier, payeeIdentifier)
+	if err != nil {
+		return err
+	}
+	for _, backingSignature := range *complianceData.BackingSignatures {
+		backingVaspPubKeyResponse, err := FetchPublicKeyForVasp(backingSignature.Domain, publicKeyCache)
+		if err != nil {
+			return err
+		}
+		err = verifySignature(signablePayload, backingSignature.Signature, *backingVaspPubKeyResponse)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // GetPostTransactionCallback Creates a signed post transaction callback.
 //
 // Args:
@@ -1078,7 +1207,7 @@ func GetPostTransactionCallback(
 	if err != nil {
 		return nil, err
 	}
-	signature, err := signPayload(*signablePayload, signingPrivateKey)
+	signature, err := utils.SignPayload(*signablePayload, signingPrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -1160,7 +1289,7 @@ func CreateUmaInvoice(
 	if err != nil {
 		return nil, err
 	}
-	signature, err := signPayloadToBytes(signablePayload, signingPrivateKey)
+	signature, err := utils.SignPayloadToBytes(signablePayload, signingPrivateKey)
 	if err != nil {
 		return nil, err
 	}
