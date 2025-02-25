@@ -31,6 +31,22 @@ func (p *PayeeData) Compliance() (*CompliancePayeeData, error) {
 	return nil, nil
 }
 
+func (p *PayeeData) stringField(field string) *string {
+	if p == nil {
+		return nil
+	}
+	if value, ok := (*p)[field]; ok {
+		if stringValue, ok := value.(string); ok {
+			return &stringValue
+		}
+	}
+	return nil
+}
+
+func (p *PayeeData) Identifier() *string {
+	return p.stringField("identifier")
+}
+
 type CompliancePayeeData struct {
 	// NodePubKey is the public key of the receiver's node if known.
 	NodePubKey *string `json:"nodePubKey,omitempty"`

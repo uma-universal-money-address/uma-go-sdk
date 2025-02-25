@@ -1123,6 +1123,14 @@ func VerifyPayReqResponseSignature(
 	if complianceData == nil {
 		return errors.New("missing compliance data")
 	}
+	payeeDataIdentifier := response.PayeeData.Identifier()
+	if payeeDataIdentifier == nil {
+		return errors.New("missing payee identifier in response")
+	}
+	if !strings.EqualFold(payeeIdentifier, *payeeDataIdentifier) {
+		return errors.New("payee identifier in response does not match payee identifier input")
+	}
+
 	if response.UmaMajorVersion == 0 {
 		return errors.New("signatures were added to payreq responses in UMA v1. This response is from an UMA v0 receiving VASP")
 	}
@@ -1133,7 +1141,7 @@ func VerifyPayReqResponseSignature(
 	if err != nil {
 		return err
 	}
-	signablePayload, err := complianceData.SignablePayload(payerIdentifier, payeeIdentifier)
+	signablePayload, err := complianceData.SignablePayload(payerIdentifier, *payeeDataIdentifier)
 	if err != nil {
 		return err
 	}

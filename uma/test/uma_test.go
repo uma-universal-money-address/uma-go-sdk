@@ -686,6 +686,15 @@ func TestMsatsPayReqResponseAndParsing(t *testing.T) {
 		"$bob@vasp2.com",
 	)
 	require.NoError(t, err)
+
+	err = uma.VerifyPayReqResponseSignature(
+		parsedResponse,
+		getPubKeyResponse(receiverSigningPrivateKey),
+		getNonceCache(),
+		"$alice@vasp1.com",
+		"$BoB@vasp2.com",
+	)
+	require.NoError(t, err)
 }
 
 func TestV0PayReqResponseAndParsing(t *testing.T) {
