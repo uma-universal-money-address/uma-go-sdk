@@ -1,9 +1,11 @@
 package protocol
 
 import (
-	"errors"
 	"strconv"
 	"strings"
+
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/errors"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/generated"
 )
 
 // PostTransactionCallback is sent between VASPs after the payment is complete.
@@ -33,7 +35,10 @@ type UtxoWithAmount struct {
 
 func (c *PostTransactionCallback) SignablePayload() (*[]byte, error) {
 	if c.Nonce == nil || c.Timestamp == nil {
-		return nil, errors.New("nonce and timestamp must be set")
+		return nil, &errors.UmaError{
+			Reason:    "nonce and timestamp must be set",
+			ErrorCode: generated.MissingRequiredUmaParameters,
+		}
 	}
 	payloadString := strings.Join([]string{
 		*c.Nonce,

@@ -3,7 +3,9 @@ package protocol
 import (
 	"encoding/hex"
 	"encoding/json"
-	"errors"
+
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/errors"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/generated"
 	"github.com/uma-universal-money-address/uma-go-sdk/uma/utils"
 )
 
@@ -37,7 +39,10 @@ func (r *PubKeyResponse) SigningPubKey() ([]byte, error) {
 		}
 		return publicKey, nil
 	} else {
-		return nil, errors.New("signingPubKeyHex is nil")
+		return nil, &errors.UmaError{
+			Reason:    "signingPubKeyHex is nil",
+			ErrorCode: generated.InvalidPubkeyFormat,
+		}
 	}
 }
 
@@ -55,7 +60,10 @@ func (r *PubKeyResponse) EncryptionPubKey() ([]byte, error) {
 		}
 		return publicKey, nil
 	} else {
-		return nil, errors.New("encryptionPubKeyHex is nil")
+		return nil, &errors.UmaError{
+			Reason:    "encryptionPubKeyHex is nil",
+			ErrorCode: generated.InvalidPubkeyFormat,
+		}
 	}
 }
 

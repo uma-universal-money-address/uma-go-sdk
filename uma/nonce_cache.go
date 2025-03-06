@@ -1,9 +1,11 @@
 package uma
 
 import (
-	"errors"
 	"sync"
 	"time"
+
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/errors"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/generated"
 )
 
 // NonceCache is an interface for a caching of nonces used in signatures. This is used to prevent replay attacks.
@@ -37,10 +39,16 @@ func NewInMemoryNonceCache(oldestValidTimestamp time.Time) *InMemoryNonceCache {
 
 func (c *InMemoryNonceCache) CheckAndSaveNonce(nonce string, timestamp time.Time) error {
 	if timestamp.Before(c.oldestValidTimestamp) {
-		return errors.New("timestamp too old")
+		return &errors.UmaError{
+			Reason:    "timestamp too old",
+			ErrorCode: generated.InvalidNonce,
+		}
 	}
 	if _, ok := c.cache.LoadOrStore(nonce, timestamp); ok {
-		return errors.New("nonce already used")
+		return &errors.UmaError{
+			Reason:    "nonce already used",
+			ErrorCode: generated.InvalidNonce,
+		}
 	}
 	return nil
 }

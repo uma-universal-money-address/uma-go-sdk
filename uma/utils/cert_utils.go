@@ -5,10 +5,12 @@ import (
 	"encoding/asn1"
 	"encoding/hex"
 	"encoding/pem"
-	"errors"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"math/big"
 	"time"
+
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/errors"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/generated"
 )
 
 func ConvertPemCertificateChainToHexEncodedDer(certChain *string) ([]string, error) {
@@ -51,7 +53,10 @@ func ExtractPubkeyFromPemCertificateChain(certChain *string) (*secp256k1.PublicK
 		return nil, err
 	}
 	if len(*asn1Certs) == 0 {
-		return nil, errors.New("empty certificate chain")
+		return nil, &errors.UmaError{
+			Reason:    "empty certificate chain",
+			ErrorCode: generated.CertChainInvalid,
+		}
 	}
 	cert := new(certificate)
 	_, err = asn1.Unmarshal((*asn1Certs)[0], cert)
@@ -68,7 +73,10 @@ func getAsn1DataFromPemChain(certChain *string) (*[][]byte, error) {
 		var block *pem.Block
 		block, pemData = pem.Decode(pemData)
 		if block == nil {
-			return nil, errors.New("failed to decode PEM block")
+			return nil, &errors.UmaError{
+				Reason:    "failed to decode PEM block",
+				ErrorCode: generated.CertChainInvalid,
+			}
 		}
 		v = append(v, block.Bytes)
 	}

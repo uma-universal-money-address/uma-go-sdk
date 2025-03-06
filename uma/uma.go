@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
+	stderrors "errors"
 	"io"
 	"math"
 	"math/big"
@@ -20,6 +20,8 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/errors"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/generated"
 	"github.com/uma-universal-money-address/uma-go-sdk/uma/protocol"
 	"github.com/uma-universal-money-address/uma-go-sdk/uma/utils"
 )
@@ -59,7 +61,10 @@ func FetchPublicKeyForVasp(vaspDomain string, cache PublicKeyCache) (*protocol.P
 	}(resp.Body)
 
 	if resp.StatusCode != 200 {
-		return nil, errors.New("invalid response from VASP")
+		return nil, &errors.UmaError{
+			Reason:    "invalid response from VASP",
+			ErrorCode: generated.CounterpartyPubkeyFetchError,
+		}
 	}
 
 	responseBodyBytes, err := io.ReadAll(resp.Body)
@@ -131,7 +136,10 @@ func VerifyPayReqSignature(query *protocol.PayRequest, otherVaspPubKeyResponse p
 		return err
 	}
 	if complianceData == nil {
-		return errors.New("missing compliance data")
+		return &errors.UmaError{
+			Reason:    "missing compliance data",
+			ErrorCode: generated.MissingRequiredUmaParameters,
+		}
 	}
 	err = nonceCache.CheckAndSaveNonce(
 		complianceData.SignatureNonce,
@@ -180,7 +188,10 @@ func verifySignature(payload []byte, signature string, otherVaspPubKeyResponse p
 	verified := parsedSignature.Verify(hashedPayload, secp256k1Key)
 
 	if !verified {
-		return errors.New("invalid uma signature")
+		return &errors.UmaError{
+			Reason:    "invalid uma signature",
+			ErrorCode: generated.InvalidSignature,
+		}
 	}
 
 	return nil
@@ -239,7 +250,7 @@ func IsUmaLnurlpQuery(url url.URL) bool {
 	// If err is an UnsupportedVersionError, the request is still an UMA request, but the version is not supported.
 	// The version negotiation should be handled by the VASP when parsing the request.
 	var unsupportedVersionError UnsupportedVersionError
-	if errors.As(err, &unsupportedVersionError) {
+	if stderrors.As(err, &unsupportedVersionError) {
 		return true
 	}
 	return err == nil && query != nil && query.IsUmaRequest()
@@ -273,7 +284,10 @@ func ParseLnurlpRequestWithReceiverDomain(requestUrl url.URL, receiverDomain str
 	if timestamp != "" {
 		timestampAsString, dateErr := strconv.ParseInt(timestamp, 10, 64)
 		if dateErr != nil {
-			return nil, errors.New("invalid timestamp")
+			return nil, &errors.UmaError{
+				Reason:    "invalid timestamp",
+				ErrorCode: generated.InvalidTimestamp,
+			}
 		}
 		timestampAsTimeVal := time.Unix(timestampAsString, 0)
 		timestampAsTime = &timestampAsTimeVal
@@ -288,12 +302,18 @@ func ParseLnurlpRequestWithReceiverDomain(requestUrl url.URL, receiverDomain str
 
 	pathParts := strings.Split(requestUrl.Path, "/")
 	if len(pathParts) != 4 || pathParts[1] != ".well-known" || pathParts[2] != "lnurlp" {
-		return nil, errors.New("invalid uma request path")
+		return nil, &errors.UmaError{
+			Reason:    "invalid uma request path",
+			ErrorCode: generated.ParseLnurlpRequestError,
+		}
 	}
 	username := pathParts[3]
 	var validUsernameRegex = regexp.MustCompile(`^[$a-zA-Z0-9._\-+]+$`)
 	if !validUsernameRegex.MatchString(username) {
-		return nil, errors.New("invalid uma username")
+		return nil, &errors.UmaError{
+			Reason:    "invalid uma username",
+			ErrorCode: generated.ParseLnurlpRequestError,
+		}
 	}
 	receiverAddress := username + "@" + receiverDomain
 
@@ -362,7 +382,10 @@ func GetLnurlpResponse(
 		}
 		for fieldName, fieldValue := range requiredUmaFields {
 			if fieldValue == nil {
-				return nil, errors.New("missing required field for UMA: " + fieldName)
+				return nil, &errors.UmaError{
+					Reason:    "missing required field for UMA: " + fieldName,
+					ErrorCode: generated.MissingRequiredUmaParameters,
+				}
 			}
 		}
 		var err error
@@ -469,7 +492,10 @@ func ParseLnurlpResponse(bytes []byte) (*protocol.LnurlpResponse, error) {
 func GetVaspDomainFromUmaAddress(umaAddress string) (string, error) {
 	addressParts := strings.Split(umaAddress, "@")
 	if len(addressParts) != 2 {
-		return "", errors.New("invalid uma address")
+		return "", &errors.UmaError{
+			Reason:    "invalid uma address",
+			ErrorCode: generated.InvalidInput,
+		}
 	}
 	return addressParts[1], nil
 }
@@ -775,7 +801,10 @@ func GetPayReqResponse(
 	successAction *map[string]string,
 ) (*protocol.PayReqResponse, error) {
 	if request.SendingAmountCurrencyCode != nil && *request.SendingAmountCurrencyCode != *receivingCurrencyCode {
-		return nil, errors.New("the sdk only supports sending in either SAT or the receiving currency")
+		return nil, &errors.UmaError{
+			Reason:    "the sdk only supports sending in either SAT or the receiving currency",
+			ErrorCode: generated.InternalError,
+		}
 	}
 	err := validatePayReqCurrencyFields(receivingCurrencyCode, receivingCurrencyDecimals, conversionRate, receiverFeesMillisats)
 	if err != nil {
@@ -910,7 +939,10 @@ func validatePayReqCurrencyFields(
 		numNilFields++
 	}
 	if numNilFields != 0 && numNilFields != 4 {
-		return errors.New("invalid currency fields. must be all nil or all non-nil")
+		return &errors.UmaError{
+			Reason:    "invalid currency fields. must be all nil or all non-nil",
+			ErrorCode: generated.InvalidInput,
+		}
 	}
 	return nil
 }
@@ -926,19 +958,31 @@ func validateUmaPayReqFields(
 	signingPrivateKeyBytes *[]byte,
 ) error {
 	if receivingCurrencyCode == nil || receivingCurrencyDecimals == nil || conversionRate == nil || receiverFeesMillisats == nil {
-		return errors.New("missing currency fields required for UMA")
+		return &errors.UmaError{
+			Reason:    "missing currency fields required for UMA",
+			ErrorCode: generated.InternalError,
+		}
 	}
 
 	if payeeIdentifier == nil {
-		return errors.New("missing required UMA field payeeIdentifier")
+		return &errors.UmaError{
+			Reason:    "missing required UMA field payeeIdentifier",
+			ErrorCode: generated.InternalError,
+		}
 	}
 
 	if signingPrivateKeyBytes == nil {
-		return errors.New("missing required UMA field signingPrivateKeyBytes")
+		return &errors.UmaError{
+			Reason:    "missing required UMA field signingPrivateKeyBytes",
+			ErrorCode: generated.InternalError,
+		}
 	}
 
 	if receiverChannelUtxos == nil && receiverNodePubKey == nil {
-		return errors.New("missing required UMA fields. receiverChannelUtxos and/or receiverNodePubKey is required")
+		return &errors.UmaError{
+			Reason:    "missing required UMA fields. receiverChannelUtxos and/or receiverNodePubKey is required",
+			ErrorCode: generated.InternalError,
+		}
 	}
 	return nil
 }
@@ -1008,10 +1052,16 @@ func VerifyPayReqResponseSignature(
 		return err
 	}
 	if complianceData == nil {
-		return errors.New("missing compliance data")
+		return &errors.UmaError{
+			Reason:    "missing compliance data",
+			ErrorCode: generated.MissingRequiredUmaParameters,
+		}
 	}
 	if response.UmaMajorVersion == 0 {
-		return errors.New("signatures were added to payreq responses in UMA v1. This response is from an UMA v0 receiving VASP")
+		return &errors.UmaError{
+			Reason:    "signatures were added to payreq responses in UMA v1. This response is from an UMA v0 receiving VASP",
+			ErrorCode: generated.InternalError,
+		}
 	}
 	err = nonceCache.CheckAndSaveNonce(
 		*complianceData.SignatureNonce,
@@ -1085,7 +1135,10 @@ func VerifyPostTransactionCallbackSignature(
 	nonceCache NonceCache,
 ) error {
 	if callback.Signature == nil || callback.Nonce == nil || callback.Timestamp == nil {
-		return errors.New("missing signature. Is this a UMA v0 callback? UMA v0 does not require signatures")
+		return &errors.UmaError{
+			Reason:    "missing signature. Is this a UMA v0 callback? UMA v0 does not require signatures",
+			ErrorCode: generated.MissingRequiredUmaParameters,
+		}
 	}
 	err := nonceCache.CheckAndSaveNonce(*callback.Nonce, time.Unix(*callback.Timestamp, 0))
 	if err != nil {
