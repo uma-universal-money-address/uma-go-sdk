@@ -47,8 +47,6 @@ type CompliancePayeeData struct {
 	// SignatureTimestamp is the unix timestamp (in seconds since epoch) of when the request was sent. Used in the signature.
 	// Note: This field is optional for UMA v0.X backwards-compatibility. It is required for UMA v1.X.
 	SignatureTimestamp *int64 `json:"signatureTimestamp,omitempty"`
-	// BackingSignatures is the list of backing signatures from VASPs that can attest to the authenticity of the message.
-	BackingSignatures *[]BackingSignature `json:"backingSignatures,omitempty"`
 }
 
 func (c *CompliancePayeeData) AsMap() (map[string]interface{}, error) {

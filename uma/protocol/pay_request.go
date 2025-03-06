@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/uma-universal-money-address/uma-go-sdk/uma/utils"
 	"net/url"
 	"strconv"
 	"strings"
@@ -242,44 +241,6 @@ func (p *PayRequest) SignablePayload() ([]byte, error) {
 		strconv.FormatInt(signatureTimestamp, 10),
 	}, "|")
 	return []byte(payloadString), nil
-}
-
-// Append a backing signature to the PayRequest.
-//
-// Args:
-//
-//	signingPrivateKey: the private key to use to sign the payload.
-//	domain: the domain of the VASP that is signing the payload. The associated public key will be fetched from
-//	/.well-known/lnurlpubkey on this domain to verify the signature.
-func (p *PayRequest) AppendBackingSignature(signingPrivateKey []byte, domain string) error {
-	signablePayload, err := p.SignablePayload()
-	if err != nil {
-		return err
-	}
-	signature, err := utils.SignPayload(signablePayload, signingPrivateKey)
-	if err != nil {
-		return err
-	}
-	complianceData, err := p.PayerData.Compliance()
-	if err != nil {
-		return err
-	}
-	if complianceData == nil {
-		return errors.New("compliance payer data is missing")
-	}
-	if complianceData.BackingSignatures == nil {
-		complianceData.BackingSignatures = &[]BackingSignature{}
-	}
-	*complianceData.BackingSignatures = append(*complianceData.BackingSignatures, BackingSignature{
-		Signature: *signature,
-		Domain:    domain,
-	})
-	complianceMap, err := complianceData.AsMap()
-	if err != nil {
-		return err
-	}
-	(*p.PayerData)["compliance"] = complianceMap
-	return nil
 }
 
 // ParsePayRequestFromQueryParams Parses a pay request from query parameters.
