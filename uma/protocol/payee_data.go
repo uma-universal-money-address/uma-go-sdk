@@ -2,9 +2,11 @@ package protocol
 
 import (
 	"encoding/json"
-	"errors"
 	"strconv"
 	"strings"
+
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/errors"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/generated"
 )
 
 // PayeeData is the data that the payer wants to know about the payee. It can be any json data.
@@ -64,10 +66,16 @@ func (c *CompliancePayeeData) AsMap() (map[string]interface{}, error) {
 
 func (c *CompliancePayeeData) SignablePayload(payerIdentifier string, payeeIdentifier string) ([]byte, error) {
 	if c == nil {
-		return nil, errors.New("compliance data is missing")
+		return nil, &errors.UmaError{
+			Reason:    "compliance data is missing",
+			ErrorCode: generated.MissingRequiredUmaParameters,
+		}
 	}
 	if c.SignatureNonce == nil || c.SignatureTimestamp == nil {
-		return nil, errors.New("compliance data is missing signature nonce or timestamp. Is this a v0.X response")
+		return nil, &errors.UmaError{
+			Reason:    "compliance data is missing signature nonce or timestamp. Is this a v0.X response",
+			ErrorCode: generated.MissingRequiredUmaParameters,
+		}
 	}
 	payloadString := strings.Join([]string{
 		payerIdentifier,

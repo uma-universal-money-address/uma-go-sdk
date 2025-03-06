@@ -1,13 +1,15 @@
 package protocol
 
 import (
-	"errors"
 	"fmt"
-	"github.com/uma-universal-money-address/uma-go-sdk/uma/utils"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/errors"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/generated"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/utils"
 )
 
 // LnurlpRequest is the first request in the UMA protocol.
@@ -56,7 +58,10 @@ func (q *LnurlpRequest) IsUmaRequest() bool {
 func (q *LnurlpRequest) EncodeToUrl() (*url.URL, error) {
 	receiverAddressParts := strings.Split(q.ReceiverAddress, "@")
 	if len(receiverAddressParts) != 2 {
-		return nil, errors.New("invalid receiver address")
+		return nil, &errors.UmaError{
+			Reason:    "invalid receiver address",
+			ErrorCode: generated.InvalidInput,
+		}
 	}
 	scheme := "https"
 	if utils.IsDomainLocalhost(receiverAddressParts[1]) {
@@ -104,7 +109,10 @@ type UmaLnurlpRequest struct {
 
 func (q *LnurlpRequest) SignablePayload() ([]byte, error) {
 	if q.Timestamp == nil || q.Nonce == nil {
-		return nil, errors.New("timestamp and nonce are required for signing")
+		return nil, &errors.UmaError{
+			Reason:    "timestamp and nonce are required for signing",
+			ErrorCode: generated.MissingRequiredUmaParameters,
+		}
 	}
 	payloadString := strings.Join([]string{q.ReceiverAddress, *q.Nonce, strconv.FormatInt(q.Timestamp.Unix(), 10)}, "|")
 	return []byte(payloadString), nil

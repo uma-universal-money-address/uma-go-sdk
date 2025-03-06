@@ -3,6 +3,8 @@ package uma
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/generated"
 )
 
 const MAJOR_VERSION = 1
@@ -19,6 +21,26 @@ type UnsupportedVersionError struct {
 
 func (e UnsupportedVersionError) Error() string {
 	return fmt.Sprintf("unsupported version: %s", e.UnsupportedVersion)
+}
+
+func (e UnsupportedVersionError) ToJSON() (string, error) {
+	data := map[string]interface{}{
+		"status":                 "ERROR",
+		"reason":                 e.Error(),
+		"code":                   generated.UnsupportedUmaVersion.Code,
+		"unsupportedVersion":     e.UnsupportedVersion,
+		"supportedMajorVersions": e.SupportedMajorVersions,
+	}
+
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+	return string(jsonBytes), nil
+}
+
+func (e UnsupportedVersionError) ToHttpStatusCode() int {
+	return generated.UnsupportedUmaVersion.HTTPStatusCode
 }
 
 func GetSupportedMajorVersionsFromErrorResponseBody(errorResponseBody []byte) ([]int, error) {

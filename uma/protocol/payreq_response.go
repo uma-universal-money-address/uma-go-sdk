@@ -2,7 +2,9 @@ package protocol
 
 import (
 	"encoding/json"
-	"errors"
+
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/errors"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/generated"
 )
 
 // PayReqResponse is the response sent by the receiver to the sender to provide an invoice.
@@ -99,7 +101,10 @@ type v1PayReqResponse struct {
 
 func (p *PayReqResponse) asV0() (*v0PayReqResponse, error) {
 	if p.UmaMajorVersion != 0 {
-		return nil, errors.New("not a v0 response")
+		return nil, &errors.UmaError{
+			Reason:    "not a v0 response",
+			ErrorCode: generated.InternalError,
+		}
 	}
 	compliance, err := p.PayeeData.Compliance()
 	if err != nil {

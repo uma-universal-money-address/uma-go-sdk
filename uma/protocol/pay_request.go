@@ -2,11 +2,13 @@ package protocol
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/errors"
+	"github.com/uma-universal-money-address/uma-go-sdk/uma/generated"
 )
 
 // PayRequest is the request sent by the sender to the receiver to retrieve an invoice.
@@ -121,7 +123,10 @@ func (p *PayRequest) UnmarshalJSON(data []byte) error {
 	} else {
 		_, ok = rawReq["amount"].(float64)
 		if !ok {
-			return errors.New("missing or invalid amount field")
+			return &errors.UmaError{
+				Reason:    "missing or invalid amount field",
+				ErrorCode: generated.InvalidInput,
+			}
 		}
 	}
 	isUma := false
@@ -165,7 +170,10 @@ func (p *PayRequest) UnmarshalFromV1(request v1PayRequest) error {
 	amount := request.Amount
 	amountParts := strings.Split(amount, ".")
 	if len(amountParts) > 2 {
-		return errors.New("invalid amount field")
+		return &errors.UmaError{
+			Reason:    "invalid amount field",
+			ErrorCode: generated.InvalidInput,
+		}
 	}
 	var err error
 	p.Amount, err = strconv.ParseInt(amountParts[0], 10, 64)
@@ -220,18 +228,27 @@ func (p *PayRequest) EncodeAsUrlParams() (*url.Values, error) {
 
 func (p *PayRequest) SignablePayload() ([]byte, error) {
 	if p.PayerData == nil {
-		return nil, errors.New("payer data is missing")
+		return nil, &errors.UmaError{
+			Reason:    "payer data is missing",
+			ErrorCode: generated.MissingRequiredUmaParameters,
+		}
 	}
 	senderAddress := p.PayerData.Identifier()
 	if senderAddress == nil || *senderAddress == "" {
-		return nil, errors.New("payer data identifier is missing")
+		return nil, &errors.UmaError{
+			Reason:    "payer data identifier is missing",
+			ErrorCode: generated.MissingRequiredUmaParameters,
+		}
 	}
 	complianceData, err := p.PayerData.Compliance()
 	if err != nil {
 		return nil, err
 	}
 	if complianceData == nil {
-		return nil, errors.New("compliance payer data is missing")
+		return nil, &errors.UmaError{
+			Reason:    "compliance payer data is missing",
+			ErrorCode: generated.MissingRequiredUmaParameters,
+		}
 	}
 	signatureNonce := complianceData.SignatureNonce
 	signatureTimestamp := complianceData.SignatureTimestamp
@@ -249,11 +266,17 @@ func (p *PayRequest) SignablePayload() ([]byte, error) {
 func ParsePayRequestFromQueryParams(query url.Values) (*PayRequest, error) {
 	amountStr := query.Get("amount")
 	if amountStr == "" {
-		return nil, errors.New("missing amount")
+		return nil, &errors.UmaError{
+			Reason:    "missing amount",
+			ErrorCode: generated.InvalidInput,
+		}
 	}
 	amountParts := strings.Split(amountStr, ".")
 	if len(amountParts) > 2 {
-		return nil, errors.New("invalid amount")
+		return nil, &errors.UmaError{
+			Reason:    "invalid amount",
+			ErrorCode: generated.InvalidInput,
+		}
 	}
 	amount, err := strconv.ParseInt(amountParts[0], 10, 64)
 	if err != nil {
