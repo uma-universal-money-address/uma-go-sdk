@@ -197,37 +197,6 @@ func TestSignAndVerifyLnurlpRequestDuplicateNonce(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestSignAndVerifyLnurlpRequestWithBackingSignature(t *testing.T) {
-	senderSigningPrivateKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	backingVaspSigningPrivateKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	queryUrl, err := uma.GetSignedLnurlpRequestUrl(senderSigningPrivateKey.Serialize(), "$bob@vasp2.com", "vasp1.com", true, nil)
-	require.NoError(t, err)
-	parsedLnurlpRequest, err := uma.ParseLnurlpRequest(*queryUrl)
-	require.NoError(t, err)
-	backingDomain := "backingvasp.com"
-	err = parsedLnurlpRequest.AppendBackingSignature(backingVaspSigningPrivateKey.Serialize(), backingDomain)
-	require.NoError(t, err)
-	queryUrl, err = parsedLnurlpRequest.EncodeToUrl()
-	require.NoError(t, err)
-	query, err := uma.ParseLnurlpRequest(*queryUrl)
-	require.NoError(t, err)
-	require.NotNil(t, query.BackingSignatures)
-	require.Equal(t, 1, len(*query.BackingSignatures))
-	err = uma.VerifyUmaLnurlpQuerySignature(
-		*query.AsUmaRequest(),
-		getPubKeyResponse(senderSigningPrivateKey),
-		getNonceCache(),
-	)
-	require.NoError(t, err)
-	publicKeyCache := uma.NewInMemoryPublicKeyCache()
-	backingVaspPubKeyResponse := getPubKeyResponse(backingVaspSigningPrivateKey)
-	publicKeyCache.AddPublicKeyForVasp(backingDomain, &backingVaspPubKeyResponse)
-	err = uma.VerifyUmaLnurlpQueryBackingSignatures(*query.AsUmaRequest(), publicKeyCache)
-	require.NoError(t, err)
-}
-
 func TestSignAndVerifyLnurlpResponse(t *testing.T) {
 	senderSigningPrivateKey, err := secp256k1.GeneratePrivateKey()
 	require.NoError(t, err)
@@ -276,68 +245,6 @@ func TestSignAndVerifyLnurlpResponse(t *testing.T) {
 	response, err = uma.ParseLnurlpResponse(responseJson)
 	require.NoError(t, err)
 	err = uma.VerifyUmaLnurlpResponseSignature(*response.AsUmaResponse(), getPubKeyResponse(receiverSigningPrivateKey), getNonceCache())
-	require.NoError(t, err)
-}
-
-func TestSignAndVerifyLnurlpResponseWithBackingSignature(t *testing.T) {
-	senderSigningPrivateKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	receiverSigningPrivateKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	backingVaspSigningPrivateKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	serializedPrivateKey := receiverSigningPrivateKey.Serialize()
-	request := createLnurlpRequest(t, senderSigningPrivateKey.Serialize())
-	metadata, err := createMetadataForBob()
-	require.NoError(t, err)
-	isSubjectToTravelRule := true
-	kycStatus := umaprotocol.KycStatusVerified
-	response, err := uma.GetLnurlpResponse(
-		request,
-		"https://vasp2.com/api/lnurl/payreq/$bob",
-		metadata,
-		1,
-		10_000_000,
-		&serializedPrivateKey,
-		&isSubjectToTravelRule,
-		&umaprotocol.CounterPartyDataOptions{
-			"name":       umaprotocol.CounterPartyDataOption{Mandatory: false},
-			"email":      umaprotocol.CounterPartyDataOption{Mandatory: false},
-			"compliance": umaprotocol.CounterPartyDataOption{Mandatory: true},
-		},
-		&[]umaprotocol.Currency{
-			{
-				Code:                "USD",
-				Name:                "US Dollar",
-				Symbol:              "$",
-				MillisatoshiPerUnit: 34_150,
-				Convertible: umaprotocol.ConvertibleCurrency{
-					MinSendable: 1,
-					MaxSendable: 10_000_000,
-				},
-				Decimals: 2,
-			},
-		},
-		&kycStatus,
-		nil,
-		nil,
-	)
-	require.NoError(t, err)
-	backingDomain := "backingvasp.com"
-	err = response.AsUmaResponse().AppendBackingSignature(backingVaspSigningPrivateKey.Serialize(), backingDomain)
-	require.NoError(t, err)
-	responseJson, err := json.Marshal(response)
-	require.NoError(t, err)
-	response, err = uma.ParseLnurlpResponse(responseJson)
-	require.NoError(t, err)
-	require.NotNil(t, response.Compliance.BackingSignatures)
-	require.Equal(t, 1, len(*response.Compliance.BackingSignatures))
-	err = uma.VerifyUmaLnurlpResponseSignature(*response.AsUmaResponse(), getPubKeyResponse(receiverSigningPrivateKey), getNonceCache())
-	require.NoError(t, err)
-	publicKeyCache := uma.NewInMemoryPublicKeyCache()
-	backingVaspPubKeyResponse := getPubKeyResponse(backingVaspSigningPrivateKey)
-	publicKeyCache.AddPublicKeyForVasp(backingDomain, &backingVaspPubKeyResponse)
-	err = uma.VerifyUmaLnurlpResponseBackingSignatures(*response.AsUmaResponse(), publicKeyCache)
 	require.NoError(t, err)
 }
 
@@ -451,53 +358,6 @@ func TestMsatsPayReqCreationAndParsing(t *testing.T) {
 	payreq, err = uma.ParsePayRequest(payreqJson)
 	require.NoError(t, err)
 	require.NotNil(t, payreq)
-}
-
-func TestSignAndVerifyPayReqBackingSignatures(t *testing.T) {
-	senderSigningPrivateKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	receiverEncryptionPrivateKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	backingVaspSigningPrivateKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	payreq, err := uma.GetUmaPayRequest(
-		1000,
-		receiverEncryptionPrivateKey.PubKey().SerializeUncompressed(),
-		senderSigningPrivateKey.Serialize(),
-		"USD",
-		true,
-		"$alice@vasp1.com",
-		1,
-		nil,
-		nil,
-		nil,
-		nil,
-		umaprotocol.KycStatusVerified,
-		nil,
-		nil,
-		"/api/lnurl/utxocallback?txid=1234",
-		nil,
-		nil,
-	)
-	require.NoError(t, err)
-	backingDomain := "backingvasp.com"
-	err = payreq.AppendBackingSignature(backingVaspSigningPrivateKey.Serialize(), backingDomain)
-	require.NoError(t, err)
-	reqJson, err := json.Marshal(payreq)
-	require.NoError(t, err)
-	payreq, err = uma.ParsePayRequest(reqJson)
-	require.NoError(t, err)
-	complianceData, err := payreq.PayerData.Compliance()
-	require.NoError(t, err)
-	require.NotNil(t, complianceData.BackingSignatures)
-	require.Equal(t, 1, len(*complianceData.BackingSignatures))
-	err = uma.VerifyPayReqSignature(payreq, getPubKeyResponse(senderSigningPrivateKey), getNonceCache())
-	require.NoError(t, err)
-	publicKeyCache := uma.NewInMemoryPublicKeyCache()
-	backingVaspPubKeyResponse := getPubKeyResponse(backingVaspSigningPrivateKey)
-	publicKeyCache.AddPublicKeyForVasp(backingDomain, &backingVaspPubKeyResponse)
-	err = uma.VerifyPayReqBackingSignatures(payreq, publicKeyCache)
-	require.NoError(t, err)
 }
 
 type FakeInvoiceCreator struct{}
@@ -770,86 +630,6 @@ func TestV0PayReqResponseAndParsing(t *testing.T) {
 	parsedResponse, err := uma.ParsePayReqResponse(payreqResponseJson)
 	require.NoError(t, err)
 	require.Equal(t, payreqResponse, parsedResponse)
-}
-
-func TestSignAndVerifyPayReqResponseBackingSignatures(t *testing.T) {
-	senderSigningPrivateKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	receiverEncryptionPrivateKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	receiverSigningPrivateKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	backingVaspSigningPrivateKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	payreq, err := uma.GetUmaPayRequest(
-		1000,
-		receiverEncryptionPrivateKey.PubKey().SerializeUncompressed(),
-		senderSigningPrivateKey.Serialize(),
-		"USD",
-		true,
-		"$alice@vasp1.com",
-		1,
-		nil,
-		nil,
-		nil,
-		nil,
-		umaprotocol.KycStatusVerified,
-		nil,
-		nil,
-		"/api/lnurl/utxocallback?txid=1234",
-		nil,
-		nil,
-	)
-	require.NoError(t, err)
-	client := &FakeInvoiceCreator{}
-	metadata, err := createMetadataForBob()
-	require.NoError(t, err)
-	payeeData := umaprotocol.PayeeData{
-		"identifier": "$bob@vasp2.com",
-	}
-	receivingCurrencyCode := "USD"
-	receivingCurrencyDecimals := 2
-	fee := int64(100_000)
-	conversionRate := float64(24_150)
-	utxoCallback := "/api/lnurl/utxocallback?txid=1234"
-	payeeIdentifier := "$bob@vasp2.com"
-	serializedPrivateKey := receiverSigningPrivateKey.Serialize()
-	payreqResponse, err := uma.GetPayReqResponse(
-		*payreq,
-		client,
-		metadata,
-		&receivingCurrencyCode,
-		&receivingCurrencyDecimals,
-		&conversionRate,
-		&fee,
-		&[]string{"abcdef12345"},
-		nil,
-		&utxoCallback,
-		&payeeData,
-		&serializedPrivateKey,
-		&payeeIdentifier,
-		nil,
-		nil,
-	)
-	require.NoError(t, err)
-	backingDomain := "backingvasp.com"
-	err = payreqResponse.AppendBackingSignature(backingVaspSigningPrivateKey.Serialize(), backingDomain, "$alice@vasp1.com", "$bob@vasp2.com")
-	require.NoError(t, err)
-	responseJson, err := json.Marshal(payreqResponse)
-	require.NoError(t, err)
-	parsedResponse, err := uma.ParsePayReqResponse(responseJson)
-	require.NoError(t, err)
-	complianceData, err := parsedResponse.PayeeData.Compliance()
-	require.NoError(t, err)
-	require.NotNil(t, complianceData.BackingSignatures)
-	require.Equal(t, 1, len(*complianceData.BackingSignatures))
-	err = uma.VerifyPayReqResponseSignature(parsedResponse, getPubKeyResponse(receiverSigningPrivateKey), getNonceCache(), "$alice@vasp1.com", "$bob@vasp2.com")
-	require.NoError(t, err)
-	publicKeyCache := uma.NewInMemoryPublicKeyCache()
-	backingVaspPubKeyResponse := getPubKeyResponse(backingVaspSigningPrivateKey)
-	publicKeyCache.AddPublicKeyForVasp(backingDomain, &backingVaspPubKeyResponse)
-	err = uma.VerifyPayReqResponseBackingSignatures(parsedResponse, publicKeyCache, "$alice@vasp1.com", "$bob@vasp2.com")
-	require.NoError(t, err)
 }
 
 func TestSignAndVerifyPostTransactionCallback(t *testing.T) {

@@ -28,8 +28,6 @@ type LnurlpRequest struct {
 	// UmaVersion is the version of the UMA protocol that VASP1 prefers to use for this transaction. For the version
 	// negotiation flow, see https://static.swimlanes.io/87f5d188e080cb8e0494e46f80f2ae74.png
 	UmaVersion *string
-	// BackingSignatures is an array of backing VASP signatures.
-	BackingSignatures *[]BackingSignature
 }
 
 // AsUmaRequest returns the request as an UmaLnurlpRequest if it is a valid UMA request, otherwise it returns nil.
@@ -47,7 +45,6 @@ func (q *LnurlpRequest) AsUmaRequest() *UmaLnurlpRequest {
 		VaspDomain:            *q.VaspDomain,
 		Timestamp:             *q.Timestamp,
 		UmaVersion:            *q.UmaVersion,
-		BackingSignatures:     q.BackingSignatures,
 	}
 }
 
@@ -79,13 +76,6 @@ func (q *LnurlpRequest) EncodeToUrl() (*url.URL, error) {
 		queryParams.Add("isSubjectToTravelRule", strconv.FormatBool(isSubjectToTravelRule))
 		queryParams.Add("timestamp", strconv.FormatInt(q.Timestamp.Unix(), 10))
 		queryParams.Add("umaVersion", *q.UmaVersion)
-		if q.BackingSignatures != nil {
-			backingSignatures := make([]string, len(*q.BackingSignatures))
-			for i, backingSignature := range *q.BackingSignatures {
-				backingSignatures[i] = fmt.Sprintf("%s:%s", backingSignature.Domain, backingSignature.Signature)
-			}
-			queryParams.Add("backingSignatures", strings.Join(backingSignatures, ","))
-		}
 	}
 	lnurlpUrl.RawQuery = queryParams.Encode()
 	return &lnurlpUrl, nil
@@ -110,8 +100,6 @@ type UmaLnurlpRequest struct {
 	// UmaVersion is the version of the UMA protocol that VASP1 prefers to use for this transaction. For the version
 	// negotiation flow, see https://static.swimlanes.io/87f5d188e080cb8e0494e46f80f2ae74.png
 	UmaVersion string
-	// BackingSignatures is an array of backing VASP signatures.
-	BackingSignatures *[]BackingSignature
 }
 
 func (q *LnurlpRequest) SignablePayload() ([]byte, error) {
@@ -120,27 +108,4 @@ func (q *LnurlpRequest) SignablePayload() ([]byte, error) {
 	}
 	payloadString := strings.Join([]string{q.ReceiverAddress, *q.Nonce, strconv.FormatInt(q.Timestamp.Unix(), 10)}, "|")
 	return []byte(payloadString), nil
-}
-
-// Append a backing signature to the LnurlpRequest.
-//
-// Args:
-//
-//	signingPrivateKey: the private key to use to sign the payload.
-//	domain: the domain of the VASP that is signing the payload. The associated public key will be fetched from
-//	/.well-known/lnurlpubkey on this domain to verify the signature.
-func (q *LnurlpRequest) AppendBackingSignature(signingPrivateKey []byte, domain string) error {
-	signablePayload, err := q.SignablePayload()
-	if err != nil {
-		return err
-	}
-	signature, err := utils.SignPayload(signablePayload, signingPrivateKey)
-	if err != nil {
-		return err
-	}
-	if q.BackingSignatures == nil {
-		q.BackingSignatures = &[]BackingSignature{}
-	}
-	*q.BackingSignatures = append(*q.BackingSignatures, BackingSignature{Signature: *signature, Domain: domain})
-	return nil
 }
