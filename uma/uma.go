@@ -644,7 +644,7 @@ func GetUmaPayRequestWithInvoice(
 	)
 }
 
-// GetUmaPayRequestWithInvoice Creates a signed UMA pay request to pay an UMA invoice. For non-UMA LNURL requests, just construct a protocol.PayRequest directly.
+// GetUmaPayRequestWithPayerData Creates a signed UMA pay request with specified payer data. For non-UMA LNURL requests, just construct a protocol.PayRequest directly.
 //
 // Args:
 //
