@@ -260,6 +260,7 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 		Type:    "IVMS",
 		Version: &ivmsVersion,
 	}
+	name := "Alice Smith"
 	payreq, err := uma.GetUmaPayRequest(
 		1000,
 		receiverEncryptionPrivateKey.PubKey().SerializeUncompressed(),
@@ -268,7 +269,7 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 		true,
 		"$alice@vasp1.com",
 		1,
-		nil,
+		&name,
 		nil,
 		&trInfo,
 		&trFormat,
@@ -301,6 +302,8 @@ func TestPayReqCreationAndParsing(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, complianceData.TravelRuleFormat, &trFormat)
 
+	require.Equal(t, (*payreq.PayerData)[umaprotocol.CounterPartyDataFieldIdentifier.String()], "$alice@vasp1.com")
+	require.Equal(t, (*payreq.PayerData)[umaprotocol.CounterPartyDataFieldName.String()], "Alice Smith")
 	encryptedTrInfo := complianceData.EncryptedTravelRuleInfo
 	require.NotNil(t, encryptedTrInfo)
 
@@ -409,6 +412,7 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 	require.NoError(t, err)
 	payeeData := umaprotocol.PayeeData{
 		"identifier": "$bob@vasp2.com",
+		"name":       "Bob Smith",
 	}
 	receivingCurrencyCode := "USD"
 	receivingCurrencyDecimals := 2
@@ -448,6 +452,8 @@ func TestPayReqResponseAndParsing(t *testing.T) {
 	parsedComplianceData, err := parsedResponse.PayeeData.Compliance()
 	require.NoError(t, err)
 	require.Equal(t, originalComplianceData, parsedComplianceData)
+	require.Equal(t, (*parsedResponse.PayeeData)[umaprotocol.CounterPartyDataFieldIdentifier.String()], payeeIdentifier)
+	require.Equal(t, (*parsedResponse.PayeeData)[umaprotocol.CounterPartyDataFieldName.String()], payeeData["name"])
 
 	err = uma.VerifyPayReqResponseSignature(
 		parsedResponse,
