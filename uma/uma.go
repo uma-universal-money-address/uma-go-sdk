@@ -574,32 +574,32 @@ func GetUmaPayRequest(
 //
 // Args:
 //
-//				amount: the amount of the payment in the smallest unit of the specified currency (i.e. cents for USD).
-//				receiverEncryptionPubKey: the public key of the receiver that will be used to encrypt the travel rule information.
-//				sendingVaspPrivateKey: the private key of the VASP that is sending the payment. This will be used to sign the request.
-//				receivingCurrencyCode: the code of the currency that the receiver will receive for this payment.
-//				isAmountInReceivingCurrency: whether the amount field is specified in the smallest unit of the receiving
-//					currency or in msats (if false).
-//				payerIdentifier: the identifier of the sender. For example, $alice@vasp1.com
-//				umaMajorVersion: the major version of UMA used for this request. If non-UMA, this version is still relevant
-//		         for which LUD-21 spec to follow. For the older LUD-21 spec, this should be 0. For the newer LUD-21 spec,
-//		         this should be 1.
-//				payerName: the name of the sender (optional).
-//				payerEmail: the email of the sender (optional).
-//				trInfo: the travel rule information. This will be encrypted before sending to the receiver.
-//				trInfoFormat: the standardized format of the travel rule information (e.g. IVMS). Null indicates raw json or a
-//					custom format, or no travel rule information.
-//				payerKycStatus: whether the sender is a KYC'd customer of the sending VASP.
-//				payerUtxos: the list of UTXOs of the sender's channels that might be used to fund the payment.
-//			 	payerNodePubKey: If known, the public key of the sender's node. If supported by the receiving VASP's compliance provider,
-//			        this will be used to pre-screen the sender's UTXOs for compliance purposes.
-//				utxoCallback: the URL that the receiver will call to send UTXOs of the channel that the receiver used to receive
-//					the payment once it completes.
-//				requestedPayeeData: the payer data options that the sender is requesting about the receiver.
-//				comment: a comment that the sender would like to include with the payment. This can only be included
-//			        if the receiver included the `commentAllowed` field in the lnurlp response. The length of
-//			        the comment must be less than or equal to the value of `commentAllowed`.
-//	         invoiceUUID: the UUID of the invoice that the sender is paying.
+//			amount: the amount of the payment in the smallest unit of the specified currency (i.e. cents for USD).
+//			receiverEncryptionPubKey: the public key of the receiver that will be used to encrypt the travel rule information.
+//			sendingVaspPrivateKey: the private key of the VASP that is sending the payment. This will be used to sign the request.
+//			receivingCurrencyCode: the code of the currency that the receiver will receive for this payment.
+//			isAmountInReceivingCurrency: whether the amount field is specified in the smallest unit of the receiving
+//				currency or in msats (if false).
+//			payerIdentifier: the identifier of the sender. For example, $alice@vasp1.com
+//			umaMajorVersion: the major version of UMA used for this request. If non-UMA, this version is still relevant
+//		        for which LUD-21 spec to follow. For the older LUD-21 spec, this should be 0. For the newer LUD-21 spec,
+//		        this should be 1.
+//			payerName: the name of the sender (optional).
+//			payerEmail: the email of the sender (optional).
+//			trInfo: the travel rule information. This will be encrypted before sending to the receiver.
+//			trInfoFormat: the standardized format of the travel rule information (e.g. IVMS). Null indicates raw json or a
+//				custom format, or no travel rule information.
+//			payerKycStatus: whether the sender is a KYC'd customer of the sending VASP.
+//			payerUtxos: the list of UTXOs of the sender's channels that might be used to fund the payment.
+//			payerNodePubKey: If known, the public key of the sender's node. If supported by the receiving VASP's compliance provider,
+//			    this will be used to pre-screen the sender's UTXOs for compliance purposes.
+//			utxoCallback: the URL that the receiver will call to send UTXOs of the channel that the receiver used to receive
+//				the payment once it completes.
+//			requestedPayeeData: the payer data options that the sender is requesting about the receiver.
+//			comment: a comment that the sender would like to include with the payment. This can only be included
+//			     if the receiver included the `commentAllowed` field in the lnurlp response. The length of
+//			     the comment must be less than or equal to the value of `commentAllowed`.
+//	        invoiceUUID: the UUID of the invoice that the sender is paying.
 func GetUmaPayRequestWithInvoice(
 	amount int64,
 	receiverEncryptionPubKey []byte,
@@ -619,6 +619,79 @@ func GetUmaPayRequestWithInvoice(
 	requestedPayeeData *protocol.CounterPartyDataOptions,
 	comment *string,
 	invoiceUUID *string,
+) (*protocol.PayRequest, error) {
+	return GetUmaPayRequestWithPayerData(
+		amount,
+		receiverEncryptionPubKey,
+		sendingVaspPrivateKey,
+		receivingCurrencyCode,
+		isAmountInReceivingCurrency,
+		payerIdentifier,
+		umaMajorVersion,
+		trInfo,
+		trInfoFormat,
+		payerKycStatus,
+		payerUtxos,
+		payerNodePubKey,
+		utxoCallback,
+		requestedPayeeData,
+		comment,
+		invoiceUUID,
+		&protocol.PayerData{
+			protocol.CounterPartyDataFieldName.String():  payerName,
+			protocol.CounterPartyDataFieldEmail.String(): payerEmail,
+		},
+	)
+}
+
+// GetUmaPayRequestWithPayerData Creates a signed UMA pay request with specified payer data. For non-UMA LNURL requests, just construct a protocol.PayRequest directly.
+//
+// Args:
+//
+//			amount: the amount of the payment in the smallest unit of the specified currency (i.e. cents for USD).
+//			receiverEncryptionPubKey: the public key of the receiver that will be used to encrypt the travel rule information.
+//			sendingVaspPrivateKey: the private key of the VASP that is sending the payment. This will be used to sign the request.
+//			receivingCurrencyCode: the code of the currency that the receiver will receive for this payment.
+//			isAmountInReceivingCurrency: whether the amount field is specified in the smallest unit of the receiving
+//				currency or in msats (if false).
+//			payerIdentifier: the identifier of the sender. For example, $alice@vasp1.com
+//			umaMajorVersion: the major version of UMA used for this request. If non-UMA, this version is still relevant
+//		        for which LUD-21 spec to follow. For the older LUD-21 spec, this should be 0. For the newer LUD-21 spec,
+//		        this should be 1.
+//			trInfo: the travel rule information. This will be encrypted before sending to the receiver.
+//			trInfoFormat: the standardized format of the travel rule information (e.g. IVMS). Null indicates raw json or a
+//				custom format, or no travel rule information.
+//			payerKycStatus: whether the sender is a KYC'd customer of the sending VASP.
+//			payerUtxos: the list of UTXOs of the sender's channels that might be used to fund the payment.
+//			payerNodePubKey: If known, the public key of the sender's node. If supported by the receiving VASP's compliance provider,
+//			    this will be used to pre-screen the sender's UTXOs for compliance purposes.
+//			utxoCallback: the URL that the receiver will call to send UTXOs of the channel that the receiver used to receive
+//				the payment once it completes.
+//			requestedPayeeData: the payer data options that the sender is requesting about the receiver.
+//			comment: a comment that the sender would like to include with the payment. This can only be included
+//			    if the receiver included the `commentAllowed` field in the lnurlp response. The length of
+//			    the comment must be less than or equal to the value of `commentAllowed`.
+//	        invoiceUUID: the UUID of the invoice that the sender is paying.
+//			payerData: the data that the sender is providing about themselves. This should include the mandatory fields
+//				requested by the receiver in the LnurlpResponse.
+func GetUmaPayRequestWithPayerData(
+	amount int64,
+	receiverEncryptionPubKey []byte,
+	sendingVaspPrivateKey []byte,
+	receivingCurrencyCode string,
+	isAmountInReceivingCurrency bool,
+	payerIdentifier string,
+	umaMajorVersion int,
+	trInfo *string,
+	trInfoFormat *protocol.TravelRuleFormat,
+	payerKycStatus protocol.KycStatus,
+	payerUtxos *[]string,
+	payerNodePubKey *string,
+	utxoCallback string,
+	requestedPayeeData *protocol.CounterPartyDataOptions,
+	comment *string,
+	invoiceUUID *string,
+	payerData *protocol.PayerData,
 ) (*protocol.PayRequest, error) {
 	complianceData, err := getSignedCompliancePayerData(
 		receiverEncryptionPubKey,
@@ -651,20 +724,25 @@ func GetUmaPayRequestWithInvoice(
 		return nil, err
 	}
 
+	if payerData == nil {
+		payerData = &protocol.PayerData{}
+	}
+	if _, ok := (*payerData)[protocol.CounterPartyDataFieldIdentifier.String()]; !ok {
+		(*payerData)[protocol.CounterPartyDataFieldIdentifier.String()] = payerIdentifier
+	}
+	if _, ok := (*payerData)[protocol.CounterPartyDataFieldCompliance.String()]; !ok {
+		(*payerData)[protocol.CounterPartyDataFieldCompliance.String()] = complianceDataMap
+	}
+
 	return &protocol.PayRequest{
 		SendingAmountCurrencyCode: sendingAmountCurrencyCode,
 		ReceivingCurrencyCode:     &receivingCurrencyCode,
 		Amount:                    amount,
-		PayerData: &protocol.PayerData{
-			protocol.CounterPartyDataFieldName.String():       payerName,
-			protocol.CounterPartyDataFieldEmail.String():      payerEmail,
-			protocol.CounterPartyDataFieldIdentifier.String(): payerIdentifier,
-			protocol.CounterPartyDataFieldCompliance.String(): complianceDataMap,
-		},
-		RequestedPayeeData: requestedPayeeData,
-		Comment:            comment,
-		UmaMajorVersion:    umaMajorVersion,
-		InvoiceUUID:        invoiceUUID,
+		PayerData:                 payerData,
+		RequestedPayeeData:        requestedPayeeData,
+		Comment:                   comment,
+		UmaMajorVersion:           umaMajorVersion,
+		InvoiceUUID:               invoiceUUID,
 	}, nil
 }
 

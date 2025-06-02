@@ -17,12 +17,29 @@ type CounterPartyDataOptions map[string]CounterPartyDataOption
 type CounterPartyDataField string
 
 const (
-	CounterPartyDataFieldIdentifier    CounterPartyDataField = "identifier"
-	CounterPartyDataFieldName          CounterPartyDataField = "name"
-	CounterPartyDataFieldEmail         CounterPartyDataField = "email"
-	CounterPartyDataFieldCountryCode   CounterPartyDataField = "countryCode"
-	CounterPartyDataFieldCompliance    CounterPartyDataField = "compliance"
+	// The UMA address of the counterparty
+	CounterPartyDataFieldIdentifier CounterPartyDataField = "identifier"
+
+	// The full name of the counterparty
+	CounterPartyDataFieldName CounterPartyDataField = "name"
+
+	// The email address of the counterparty
+	CounterPartyDataFieldEmail CounterPartyDataField = "email"
+
+	// The country code of the counterparty, in ISO 3166-1 alpha-2 format
+	CounterPartyDataFieldCountryCode CounterPartyDataField = "countryCode"
+
+	// Compliance-related data including KYC status, UTXOs, and travel rule information
+	CounterPartyDataFieldCompliance CounterPartyDataField = "compliance"
+
+	// The account number of the counterparty
 	CounterPartyDataFieldAccountNumber CounterPartyDataField = "accountNumber"
+
+	// The counterparty's date of birth, in ISO 8601 format
+	CounterPartyDataFieldBirthDate CounterPartyDataField = "birthDate"
+
+	// The counterparty's nationality, in ISO 3166-1 alpha-2 format
+	CounterPartyDataFieldNationality CounterPartyDataField = "nationality"
 )
 
 func (c CounterPartyDataField) String() string {
