@@ -40,6 +40,12 @@ const (
 
 	// The counterparty's nationality, in ISO 3166-1 alpha-2 format
 	CounterPartyDataFieldNationality CounterPartyDataField = "nationality"
+
+	// The counterparty's country of residence, in ISO 3166-1 alpha-2 format
+	CounterPartyDataFieldCountryOfResidence CounterPartyDataField = "countryOfResidence"
+
+	// The counterparty's phone number, in E.164 format
+	CounterPartyDataFieldPhoneNumber CounterPartyDataField = "phoneNumber"
 )
 
 func (c CounterPartyDataField) String() string {
